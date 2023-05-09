@@ -45,6 +45,7 @@ func TestPostHandler_PositiveCases(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				urlList = map[string]string{}
 				resp, respBody := testRequest(t, ts, "POST", "/", tt.URL)
+				defer resp.Body.Close()
 				assert.Equal(t, tt.expectedStatus, resp.StatusCode, "Код ответа не совпадает с ожидаемым")
 				assert.Contains(t, resp.Header.Get("Content-Type"), tt.contentType, "Content-Type не совпадает с ожидаемым")
 				require.NotEmpty(t, respBody, "Тело ответа пустое")
@@ -76,6 +77,7 @@ func TestPostHandler_NegativeCases(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				urlList = map[string]string{}
 				resp, respBody := testRequest(t, ts, "POST", "/", "")
+				defer resp.Body.Close()
 				assert.Equal(t, tt.expectedStatus, resp.StatusCode, "Код ответа не совпадает с ожидаемым")
 				require.NotEmpty(t, respBody, "Тело ответа пустое")
 				require.Contains(t, respBody, tt.expectedError, "Текст ошибки не совпадает с ожидаемым")
@@ -106,6 +108,7 @@ func TestGetHandler_PositiveCases(t *testing.T) {
 				urlList = map[string]string{}
 				urlList[tt.shortURL] = tt.expectedLocation
 				resp, respBody := testRequest(t, ts, "GET", "/"+tt.shortURL, "")
+				defer resp.Body.Close()
 				assert.Equal(t, tt.expectedStatus, resp.StatusCode, "Код ответа не совпадает с ожидаемым")
 				require.NotEmpty(t, respBody, "Тело ответа пустое")
 				require.Contains(t, respBody, tt.expectedLocation, "Location не совпадает с ожидаемым")
@@ -142,6 +145,7 @@ func TestGetHandler_NegativeCases(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				urlList = map[string]string{}
 				resp, respBody := testRequest(t, ts, "GET", "/"+tt.shortURL, "")
+				defer resp.Body.Close()
 				assert.Equal(t, tt.expectedStatus, resp.StatusCode, "Код ответа не совпадает с ожидаемым")
 				if tt.wantError {
 					require.Contains(t, respBody, tt.expectedError, "Текст ошибки не совпадает с ожидаемым")
