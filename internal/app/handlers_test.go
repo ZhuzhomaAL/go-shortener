@@ -3,6 +3,7 @@ package app
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -16,34 +17,34 @@ func TestPostHandler_PositiveCases(t *testing.T) {
 		expectedStatus int
 		contentType    string
 		URL            string
-		baseUrl        string
+		baseURL        string
 	}{
 		{
 			name:           "success_create_short_url",
 			expectedStatus: http.StatusCreated,
 			contentType:    "text/plain",
 			URL:            "https://practicum.yandex.ru",
-			baseUrl:        "http://localhost:8080/",
+			baseURL:        "http://localhost:8080/",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
 				b := strings.NewReader(tt.URL)
-				req := httptest.NewRequest(http.MethodPost, tt.baseUrl, b)
+				req := httptest.NewRequest(http.MethodPost, tt.baseURL, b)
 				nr := httptest.NewRecorder()
 				urlList = map[string]string{}
 				postHandler(nr, req)
 				res := nr.Result()
 				assert.Equal(t, tt.expectedStatus, res.StatusCode, "Код ответа не совпадает с ожидаемым")
 				assert.Contains(t, res.Header.Get("Content-Type"), tt.contentType, "Content-Type не совпадает с ожидаемым")
-				result, err := ioutil.ReadAll(res.Body)
+				result, err := io.ReadAll(res.Body)
 				require.NoError(t, err)
 				err = res.Body.Close()
 				require.NoError(t, err)
 				require.NotEmpty(t, result, "Тело ответа пустое")
-				require.True(t, strings.Contains(string(result), tt.baseUrl))
-				require.True(t, len(string(result)) > len(tt.baseUrl))
+				require.True(t, strings.Contains(string(result), tt.baseURL))
+				require.True(t, len(string(result)) > len(tt.baseURL))
 			},
 		)
 	}
@@ -53,26 +54,26 @@ func TestPostHandler_NegativeCases(t *testing.T) {
 	tests := []struct {
 		name           string
 		expectedStatus int
-		baseUrl        string
+		baseURL        string
 		expectedError  string
 	}{
 		{
 			name:           "empty_body",
 			expectedStatus: http.StatusBadRequest,
-			baseUrl:        "http://localhost:8080/",
+			baseURL:        "http://localhost:8080/",
 			expectedError:  "response body is empty, expected not empty",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				req := httptest.NewRequest(http.MethodPost, tt.baseUrl, nil)
+				req := httptest.NewRequest(http.MethodPost, tt.baseURL, nil)
 				nr := httptest.NewRecorder()
 				urlList = map[string]string{}
 				postHandler(nr, req)
 				res := nr.Result()
 				assert.Equal(t, tt.expectedStatus, res.StatusCode, "Код ответа не совпадает с ожидаемым")
-				result, err := ioutil.ReadAll(res.Body)
+				result, err := io.ReadAll(res.Body)
 				require.NoError(t, err)
 				err = res.Body.Close()
 				require.NoError(t, err)
