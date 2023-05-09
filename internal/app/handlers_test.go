@@ -4,7 +4,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -153,7 +152,7 @@ func TestGetHandler_NegativeCases(t *testing.T) {
 				getHandler(nr, req)
 				res := nr.Result()
 				assert.Equal(t, tt.expectedStatus, res.StatusCode, "Код ответа не совпадает с ожидаемым")
-				result, err := ioutil.ReadAll(res.Body)
+				result, err := io.ReadAll(res.Body)
 				require.NoError(t, err)
 				err = res.Body.Close()
 				require.NoError(t, err)
