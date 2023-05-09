@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"github.com/ZhuzhomaAL/go-shortener/cmd/config"
 	"github.com/dchest/uniuri"
 	"github.com/go-chi/chi/v5"
 	"io"
@@ -29,7 +30,7 @@ func postHandler(rw http.ResponseWriter, req *http.Request) {
 	}
 	genShortStr := uniuri.NewLen(8)
 	urlList[genShortStr] = string(resp)
-	respString := fmt.Sprintf("http://localhost:8080/%s", genShortStr)
+	respString := fmt.Sprintf(config.FlagShortAddr+"/%s", genShortStr)
 	rw.WriteHeader(http.StatusCreated)
 	_, err = rw.Write([]byte(respString))
 	if err != nil {
