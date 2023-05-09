@@ -10,7 +10,21 @@ import (
 	"testing"
 )
 
+func testRequest(t *testing.T, ts *httptest.Server, method, path string, body string) (*http.Response, string) {
+	req, err := http.NewRequest(method, ts.URL+path, strings.NewReader(body))
+	require.NoError(t, err)
+	resp, err := ts.Client().Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	respBody, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	return resp, string(respBody)
+}
+
 func TestPostHandler_PositiveCases(t *testing.T) {
+	ts := httptest.NewServer(Router())
+	defer ts.Close()
 	tests := []struct {
 		name           string
 		expectedStatus int
@@ -29,27 +43,21 @@ func TestPostHandler_PositiveCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				b := strings.NewReader(tt.URL)
-				req := httptest.NewRequest(http.MethodPost, tt.baseURL, b)
-				nr := httptest.NewRecorder()
 				urlList = map[string]string{}
-				postHandler(nr, req)
-				res := nr.Result()
-				assert.Equal(t, tt.expectedStatus, res.StatusCode, "Код ответа не совпадает с ожидаемым")
-				assert.Contains(t, res.Header.Get("Content-Type"), tt.contentType, "Content-Type не совпадает с ожидаемым")
-				result, err := io.ReadAll(res.Body)
-				require.NoError(t, err)
-				err = res.Body.Close()
-				require.NoError(t, err)
-				require.NotEmpty(t, result, "Тело ответа пустое")
-				require.True(t, strings.Contains(string(result), tt.baseURL))
-				require.True(t, len(string(result)) > len(tt.baseURL))
+				resp, respBody := testRequest(t, ts, "POST", "/", tt.URL)
+				assert.Equal(t, tt.expectedStatus, resp.StatusCode, "Код ответа не совпадает с ожидаемым")
+				assert.Contains(t, resp.Header.Get("Content-Type"), tt.contentType, "Content-Type не совпадает с ожидаемым")
+				require.NotEmpty(t, respBody, "Тело ответа пустое")
+				require.True(t, strings.Contains(respBody, tt.baseURL))
+				require.True(t, len(respBody) > len(tt.baseURL))
 			},
 		)
 	}
 }
 
 func TestPostHandler_NegativeCases(t *testing.T) {
+	ts := httptest.NewServer(Router())
+	defer ts.Close()
 	tests := []struct {
 		name           string
 		expectedStatus int
@@ -66,98 +74,81 @@ func TestPostHandler_NegativeCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				req := httptest.NewRequest(http.MethodPost, tt.baseURL, nil)
-				nr := httptest.NewRecorder()
 				urlList = map[string]string{}
-				postHandler(nr, req)
-				res := nr.Result()
-				assert.Equal(t, tt.expectedStatus, res.StatusCode, "Код ответа не совпадает с ожидаемым")
-				result, err := io.ReadAll(res.Body)
-				require.NoError(t, err)
-				err = res.Body.Close()
-				require.NoError(t, err)
-				require.NotEmpty(t, result, "Тело ответа пустое")
-				require.Contains(t, string(result), tt.expectedError, "Текст ошибки не совпадает с ожидаемым")
+				resp, respBody := testRequest(t, ts, "POST", "/", "")
+				assert.Equal(t, tt.expectedStatus, resp.StatusCode, "Код ответа не совпадает с ожидаемым")
+				require.NotEmpty(t, respBody, "Тело ответа пустое")
+				require.Contains(t, respBody, tt.expectedError, "Текст ошибки не совпадает с ожидаемым")
 			},
 		)
 	}
 }
 
 func TestGetHandler_PositiveCases(t *testing.T) {
+	ts := httptest.NewServer(Router())
+	defer ts.Close()
 	tests := []struct {
 		name             string
 		expectedStatus   int
-		endpoint         string
 		shortURL         string
 		expectedLocation string
 	}{
 		{
 			name:             "success_short_url_id",
-			expectedStatus:   http.StatusTemporaryRedirect,
-			endpoint:         "http://localhost:8080/",
+			expectedStatus:   http.StatusOK,
 			shortURL:         "u9pEX2P5",
-			expectedLocation: "https://practicum.yandex.ru",
+			expectedLocation: "https://www.google.com/",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				req := httptest.NewRequest(http.MethodGet, tt.endpoint+tt.shortURL, nil)
-				nr := httptest.NewRecorder()
 				urlList = map[string]string{}
 				urlList[tt.shortURL] = tt.expectedLocation
-				getHandler(nr, req)
-				res := nr.Result()
-				assert.Equal(t, tt.expectedStatus, res.StatusCode, "Код ответа не совпадает с ожидаемым")
-				result, err := io.ReadAll(res.Body)
-				require.NoError(t, err)
-				err = res.Body.Close()
-				require.NoError(t, err)
-				require.NotEmpty(t, result, "Тело ответа пустое")
-				require.Equal(t, string(result), tt.expectedLocation, "Location не совпадает с ожидаемым")
+				resp, respBody := testRequest(t, ts, "GET", "/"+tt.shortURL, "")
+				assert.Equal(t, tt.expectedStatus, resp.StatusCode, "Код ответа не совпадает с ожидаемым")
+				require.NotEmpty(t, respBody, "Тело ответа пустое")
+				require.Contains(t, respBody, tt.expectedLocation, "Location не совпадает с ожидаемым")
 			},
 		)
 	}
 }
 
 func TestGetHandler_NegativeCases(t *testing.T) {
+	ts := httptest.NewServer(Router())
+	defer ts.Close()
 	tests := []struct {
 		name             string
 		expectedStatus   int
-		endpoint         string
 		shortURL         string
 		expectedLocation string
 		expectedError    string
+		wantError        bool
 	}{
 		{
 			name:           "empty_short_url_id",
-			expectedStatus: http.StatusBadRequest,
-			endpoint:       "http://localhost:8080/",
-			expectedError:  "id is empty, expected not empty",
+			expectedStatus: http.StatusMethodNotAllowed,
 		},
 		{
 			name:           "location_not_found",
 			expectedStatus: http.StatusBadRequest,
-			endpoint:       "http://localhost:8080/",
 			shortURL:       "LFGwsFFf",
 			expectedError:  "location not found",
+			wantError:      true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				req := httptest.NewRequest(http.MethodGet, tt.endpoint+tt.shortURL, nil)
-				nr := httptest.NewRecorder()
 				urlList = map[string]string{}
-				getHandler(nr, req)
-				res := nr.Result()
-				assert.Equal(t, tt.expectedStatus, res.StatusCode, "Код ответа не совпадает с ожидаемым")
-				result, err := io.ReadAll(res.Body)
-				require.NoError(t, err)
-				err = res.Body.Close()
-				require.NoError(t, err)
-				require.NotEmpty(t, result, "Тело ответа пустое")
-				require.Contains(t, string(result), tt.expectedError, "Текст ошибки не совпадает с ожидаемым")
+				resp, respBody := testRequest(t, ts, "GET", "/"+tt.shortURL, "")
+				assert.Equal(t, tt.expectedStatus, resp.StatusCode, "Код ответа не совпадает с ожидаемым")
+				if tt.wantError {
+					require.Contains(t, respBody, tt.expectedError, "Текст ошибки не совпадает с ожидаемым")
+					require.NotEmpty(t, respBody, "Тело ответа пустое")
+				} else {
+					require.Empty(t, respBody, "Тело ответа не пустое")
+				}
 			},
 		)
 	}

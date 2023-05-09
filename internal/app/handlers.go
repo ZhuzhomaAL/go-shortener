@@ -3,19 +3,10 @@ package app
 import (
 	"fmt"
 	"github.com/dchest/uniuri"
+	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
-	"strings"
 )
-
-func handler(rw http.ResponseWriter, req *http.Request) {
-	switch req.Method {
-	case http.MethodGet:
-		getHandler(rw, req)
-	case http.MethodPost:
-		postHandler(rw, req)
-	}
-}
 
 func postHandler(rw http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodPost {
@@ -51,12 +42,7 @@ func getHandler(rw http.ResponseWriter, req *http.Request) {
 		rw.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	id := req.URL.Path
-	id = strings.TrimPrefix(id, "/")
-	if id == "" {
-		http.Error(rw, "id is empty, expected not empty", http.StatusBadRequest)
-		return
-	}
+	id := chi.URLParam(req, "id")
 	location, ok := urlList[id]
 	if !ok {
 		http.Error(rw, "location not found", http.StatusBadRequest)
