@@ -7,10 +7,21 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
+	"sync"
 	"testing"
 )
 
+var ts *httptest.Server
+
+func TestMain(m *testing.M) {
+	appConfig := config.ParseFlags()
+	ts = httptest.NewServer(Router(appConfig))
+	defer ts.Close()
+	status := m.Run()
+	os.Exit(status)
+}
 func testRequest(t *testing.T, ts *httptest.Server, method, path string, body string) (*http.Response, string) {
 	req, err := http.NewRequest(method, ts.URL+path, strings.NewReader(body))
 	require.NoError(t, err)
@@ -24,9 +35,6 @@ func testRequest(t *testing.T, ts *httptest.Server, method, path string, body st
 }
 
 func TestPostHandler_PositiveCases(t *testing.T) {
-	config.ParseFlags()
-	ts := httptest.NewServer(Router())
-	defer ts.Close()
 	tests := []struct {
 		name           string
 		expectedStatus int
@@ -45,7 +53,7 @@ func TestPostHandler_PositiveCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				urlList = map[string]string{}
+				urlList = sync.Map{}
 				resp, respBody := testRequest(t, ts, "POST", "/", tt.URL)
 				defer resp.Body.Close()
 				assert.Equal(t, tt.expectedStatus, resp.StatusCode, "Код ответа не совпадает с ожидаемым")
@@ -59,8 +67,6 @@ func TestPostHandler_PositiveCases(t *testing.T) {
 }
 
 func TestPostHandler_NegativeCases(t *testing.T) {
-	ts := httptest.NewServer(Router())
-	defer ts.Close()
 	tests := []struct {
 		name           string
 		expectedStatus int
@@ -77,7 +83,7 @@ func TestPostHandler_NegativeCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				urlList = map[string]string{}
+				urlList = sync.Map{}
 				resp, respBody := testRequest(t, ts, "POST", "/", "")
 				defer resp.Body.Close()
 				assert.Equal(t, tt.expectedStatus, resp.StatusCode, "Код ответа не совпадает с ожидаемым")
@@ -89,8 +95,6 @@ func TestPostHandler_NegativeCases(t *testing.T) {
 }
 
 func TestGetHandler_PositiveCases(t *testing.T) {
-	ts := httptest.NewServer(Router())
-	defer ts.Close()
 	tests := []struct {
 		name             string
 		expectedStatus   int
@@ -107,8 +111,8 @@ func TestGetHandler_PositiveCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				urlList = map[string]string{}
-				urlList[tt.shortURL] = tt.expectedLocation
+				urlList = sync.Map{}
+				urlList.Store(tt.shortURL, tt.expectedLocation)
 				resp, respBody := testRequest(t, ts, "GET", "/"+tt.shortURL, "")
 				defer resp.Body.Close()
 				assert.Equal(t, tt.expectedStatus, resp.StatusCode, "Код ответа не совпадает с ожидаемым")
@@ -120,8 +124,6 @@ func TestGetHandler_PositiveCases(t *testing.T) {
 }
 
 func TestGetHandler_NegativeCases(t *testing.T) {
-	ts := httptest.NewServer(Router())
-	defer ts.Close()
 	tests := []struct {
 		name             string
 		expectedStatus   int
@@ -145,7 +147,7 @@ func TestGetHandler_NegativeCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				urlList = map[string]string{}
+				urlList = sync.Map{}
 				resp, respBody := testRequest(t, ts, "GET", "/"+tt.shortURL, "")
 				defer resp.Body.Close()
 				assert.Equal(t, tt.expectedStatus, resp.StatusCode, "Код ответа не совпадает с ожидаемым")

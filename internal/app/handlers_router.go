@@ -1,17 +1,22 @@
 package app
 
 import (
+	"github.com/ZhuzhomaAL/go-shortener/cmd/config"
 	"github.com/go-chi/chi/v5"
+	"sync"
 )
 
-var urlList map[string]string
+var urlList sync.Map
 
-func Router() chi.Router {
-	urlList = map[string]string{}
+func Router(appConfig config.AppConfig) chi.Router {
+	urlList = sync.Map{}
+	app := &app{
+		appConfig: appConfig,
+	}
 
 	r := chi.NewRouter()
-	r.Post("/", postHandler)
-	r.Get("/{id}", getHandler)
+	r.Post("/", app.postHandler)
+	r.Get("/{id}", app.getHandler)
 
 	return r
 }

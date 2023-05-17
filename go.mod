@@ -1,6 +1,6 @@
 module github.com/ZhuzhomaAL/go-shortener
 
-go 1.18
+go 1.20
 
 require (
 	github.com/dchest/uniuri v1.2.0

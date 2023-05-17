@@ -5,21 +5,23 @@ import (
 	"os"
 )
 
-var (
+type AppConfig struct {
 	FlagRunAddr   string
 	FlagShortAddr string
-)
+}
 
-func ParseFlags() {
-	flag.StringVar(&FlagRunAddr, "a", ":8080", "address and port to run server")
-	flag.StringVar(&FlagShortAddr, "b", "http://localhost:8080", "address and port before short url")
+func ParseFlags() AppConfig {
+	var appConfig AppConfig
+	flag.StringVar(&appConfig.FlagRunAddr, "a", ":8080", "address and port to run server")
+	flag.StringVar(&appConfig.FlagShortAddr, "b", "http://localhost:8080", "address and port before short url")
 	flag.Parse()
 
 	if envRunAddr := os.Getenv("SERVER_ADDRESS"); envRunAddr != "" {
-		FlagRunAddr = envRunAddr
+		appConfig.FlagRunAddr = envRunAddr
 	}
 
 	if envBaseURL := os.Getenv("BASE_URL"); envBaseURL != "" {
-		FlagShortAddr = envBaseURL
+		appConfig.FlagShortAddr = envBaseURL
 	}
+	return appConfig
 }
