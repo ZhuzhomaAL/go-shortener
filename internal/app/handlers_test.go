@@ -51,6 +51,7 @@ func TestPostHandler_PositiveCases(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(
 			tt.name, func(t *testing.T) {
 				urlList = sync.Map{}
@@ -81,6 +82,7 @@ func TestPostHandler_NegativeCases(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(
 			tt.name, func(t *testing.T) {
 				urlList = sync.Map{}
@@ -109,6 +111,7 @@ func TestGetHandler_PositiveCases(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(
 			tt.name, func(t *testing.T) {
 				urlList = sync.Map{}
@@ -145,6 +148,7 @@ func TestGetHandler_NegativeCases(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(
 			tt.name, func(t *testing.T) {
 				urlList = sync.Map{}

@@ -6,6 +6,7 @@ import (
 	"github.com/dchest/uniuri"
 	"github.com/go-chi/chi/v5"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 )
@@ -38,6 +39,7 @@ func (a *app) postHandler(rw http.ResponseWriter, req *http.Request) {
 	}
 	rw.WriteHeader(http.StatusCreated)
 	if _, err := rw.Write([]byte(respString)); err != nil {
+		log.Println(err)
 		return
 	}
 }
@@ -53,6 +55,7 @@ func (a *app) getHandler(rw http.ResponseWriter, req *http.Request) {
 	rw.Header().Set("Location", locationStr)
 	rw.WriteHeader(http.StatusTemporaryRedirect)
 	if _, err := rw.Write([]byte(locationStr)); err != nil {
+		log.Println(err)
 		return
 	}
 }
