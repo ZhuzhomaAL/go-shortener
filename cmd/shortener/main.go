@@ -3,7 +3,6 @@ package main
 import (
 	"github.com/ZhuzhomaAL/go-shortener/cmd/config"
 	"github.com/ZhuzhomaAL/go-shortener/internal/app"
-	_ "github.com/ZhuzhomaAL/go-shortener/internal/app"
 	"github.com/ZhuzhomaAL/go-shortener/internal/logger"
 	"go.uber.org/zap"
 	"log"
