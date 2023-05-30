@@ -2,6 +2,7 @@ package app
 
 import (
 	"github.com/ZhuzhomaAL/go-shortener/cmd/config"
+	"github.com/ZhuzhomaAL/go-shortener/internal/logger"
 	"github.com/go-chi/chi/v5"
 	"sync"
 )
@@ -15,8 +16,8 @@ func Router(appConfig config.AppConfig) chi.Router {
 	}
 
 	r := chi.NewRouter()
-	r.Post("/", app.postHandler)
-	r.Get("/{id}", app.getHandler)
+	r.Post("/", logger.RequestLogger(app.postHandler))
+	r.Get("/{id}", logger.RequestLogger(app.getHandler))
 
 	return r
 }
