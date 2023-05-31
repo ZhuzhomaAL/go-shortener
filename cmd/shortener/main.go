@@ -17,10 +17,10 @@ func main() {
 }
 
 func run(appConfig config.AppConfig) error {
-
-	if err := logger.Initialize(appConfig.FlagLogLevel); err != nil {
+	l := logger.MyLogger{}
+	if err := l.Initialize(appConfig.FlagLogLevel); err != nil {
 		return err
 	}
-	logger.Log.Info("Running server", zap.String("address", appConfig.FlagRunAddr))
-	return http.ListenAndServe(appConfig.FlagRunAddr, app.Router(appConfig))
+	l.L.Info("Running server", zap.String("address", appConfig.FlagRunAddr))
+	return http.ListenAndServe(appConfig.FlagRunAddr, app.Router(appConfig, l))
 }

@@ -1,10 +1,11 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/ZhuzhomaAL/go-shortener/cmd/config"
+	"github.com/ZhuzhomaAL/go-shortener/internal/logger"
 	"github.com/dchest/uniuri"
-	"github.com/go-chi/chi/v5"
 	"io"
 	"log"
 	"net/http"
@@ -13,6 +14,15 @@ import (
 
 type app struct {
 	appConfig config.AppConfig
+	log       logger.MyLogger
+}
+
+type result struct {
+	Result string `json:"result"`
+}
+
+type reqURL struct {
+	ReqURL string `json:"url"`
 }
 
 func (a *app) postHandler(rw http.ResponseWriter, req *http.Request) {
@@ -44,8 +54,7 @@ func (a *app) postHandler(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (a *app) getHandler(rw http.ResponseWriter, req *http.Request) {
-	id := chi.URLParam(req, "id")
+func (a *app) getHandler(rw http.ResponseWriter, req *http.Request, id string) {
 	location, ok := urlList.Load(id)
 	locationStr := fmt.Sprintf("%v", location)
 	if !ok {
@@ -55,6 +64,41 @@ func (a *app) getHandler(rw http.ResponseWriter, req *http.Request) {
 	rw.Header().Set("Location", locationStr)
 	rw.WriteHeader(http.StatusTemporaryRedirect)
 	if _, err := rw.Write([]byte(locationStr)); err != nil {
+		log.Println(err)
+		return
+	}
+}
+
+func (a *app) JSONHandler(rw http.ResponseWriter, req *http.Request) {
+	var reqUrl reqURL
+	var result result
+
+	if req.Body == nil {
+		http.Error(rw, "request is empty, expected not empty", http.StatusBadRequest)
+		return
+	}
+
+	if err := json.NewDecoder(req.Body).Decode(&reqUrl); err != nil {
+		http.Error(rw, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	genShortStr := uniuri.NewLen(8)
+	urlList.Store(genShortStr, reqUrl.ReqURL)
+	respString, err := url.JoinPath(a.appConfig.FlagShortAddr, genShortStr)
+	if err != nil {
+		http.Error(rw, "failed to process request", http.StatusBadRequest)
+		return
+	}
+	result.Result = respString
+	resp, err := json.Marshal(result)
+	if err != nil {
+		http.Error(rw, "failed to process request", http.StatusInternalServerError)
+		return
+	}
+	rw.Header().Set("Content-Type", "application/json")
+	rw.WriteHeader(http.StatusOK)
+	if _, err := rw.Write(resp); err != nil {
 		log.Println(err)
 		return
 	}

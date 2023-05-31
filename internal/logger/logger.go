@@ -7,9 +7,11 @@ import (
 	"go.uber.org/zap"
 )
 
-var Log *zap.Logger = zap.NewNop()
+type MyLogger struct {
+	L *zap.Logger
+}
 
-func Initialize(level string) error {
+func (l *MyLogger) Initialize(level string) error {
 	lvl, err := zap.ParseAtomicLevel(level)
 	if err != nil {
 		return err
@@ -20,31 +22,33 @@ func Initialize(level string) error {
 	if err != nil {
 		return err
 	}
-	Log = zl
+	l.L = zl
 	return nil
 }
 
-func RequestLogger(h http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		responseData := &responseData{
-			status: 0,
-			size:   0,
-		}
-		lw := loggingResponseWriter{
-			ResponseWriter: w,
-			responseData:   responseData,
-		}
-		h.ServeHTTP(&lw, r)
-		Log.Info(
-			"got incoming HTTP request",
-			zap.String("method", r.Method),
-			zap.String("url", r.RequestURI),
-			zap.Duration("latency", time.Since(start)),
-			zap.Int("status", responseData.status),
-			zap.Int("size", responseData.size),
-		)
-	}
+func (l *MyLogger) RequestLogger(h http.Handler) http.Handler {
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+			responseData := &responseData{
+				status: 0,
+				size:   0,
+			}
+			lw := loggingResponseWriter{
+				ResponseWriter: w,
+				responseData:   responseData,
+			}
+			h.ServeHTTP(&lw, r)
+			l.L.Info(
+				"got incoming HTTP request",
+				zap.String("method", r.Method),
+				zap.String("url", r.RequestURI),
+				zap.Duration("latency", time.Since(start)),
+				zap.Int("status", responseData.status),
+				zap.Int("size", responseData.size),
+			)
+		},
+	)
 }
 
 type (
