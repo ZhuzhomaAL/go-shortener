@@ -185,7 +185,7 @@ func TestJSONHandler(t *testing.T) {
 		{
 			name:           "success_json_post_request",
 			method:         http.MethodPost,
-			expectedStatus: http.StatusOK,
+			expectedStatus: http.StatusCreated,
 			body:           "{\n  \"url\": \"https://practicum.yandex.ru\"\n} ",
 			baseURL:        "http://localhost:8080/",
 		},

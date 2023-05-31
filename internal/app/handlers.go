@@ -70,7 +70,7 @@ func (a *app) getHandler(rw http.ResponseWriter, req *http.Request, id string) {
 }
 
 func (a *app) JSONHandler(rw http.ResponseWriter, req *http.Request) {
-	var reqUrl reqURL
+	var reqURL reqURL
 	var result result
 
 	if req.Body == nil {
@@ -78,13 +78,13 @@ func (a *app) JSONHandler(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if err := json.NewDecoder(req.Body).Decode(&reqUrl); err != nil {
+	if err := json.NewDecoder(req.Body).Decode(&reqURL); err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	genShortStr := uniuri.NewLen(8)
-	urlList.Store(genShortStr, reqUrl.ReqURL)
+	urlList.Store(genShortStr, reqURL.ReqURL)
 	respString, err := url.JoinPath(a.appConfig.FlagShortAddr, genShortStr)
 	if err != nil {
 		http.Error(rw, "failed to process request", http.StatusBadRequest)
@@ -97,7 +97,7 @@ func (a *app) JSONHandler(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 	rw.Header().Set("Content-Type", "application/json")
-	rw.WriteHeader(http.StatusOK)
+	rw.WriteHeader(http.StatusCreated)
 	if _, err := rw.Write(resp); err != nil {
 		log.Println(err)
 		return
