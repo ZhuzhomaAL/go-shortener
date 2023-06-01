@@ -6,6 +6,7 @@ require (
 	github.com/dchest/uniuri v1.2.0
 	github.com/go-chi/chi/v5 v5.0.8
 	github.com/go-resty/resty/v2 v2.7.0
+	github.com/google/uuid v1.3.0
 	github.com/stretchr/testify v1.8.2
 	go.uber.org/zap v1.24.0
 )

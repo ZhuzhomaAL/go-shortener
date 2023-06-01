@@ -6,6 +6,7 @@ import (
 	"github.com/ZhuzhomaAL/go-shortener/cmd/config"
 	"github.com/ZhuzhomaAL/go-shortener/internal/logger"
 	"github.com/dchest/uniuri"
+	"github.com/google/uuid"
 	"io"
 	"log"
 	"net/http"
@@ -15,6 +16,8 @@ import (
 type app struct {
 	appConfig config.AppConfig
 	log       logger.MyLogger
+	fWriter   *Writer
+	fReader   *Reader
 }
 
 type result struct {
@@ -42,6 +45,17 @@ func (a *app) postHandler(rw http.ResponseWriter, req *http.Request) {
 	}
 	genShortStr := uniuri.NewLen(8)
 	urlList.Store(genShortStr, string(resp))
+	id := uuid.New()
+	fileURL := &URL{
+		id,
+		genShortStr,
+		string(resp),
+	}
+	err = a.fWriter.WriteFile(fileURL)
+	if err != nil {
+		http.Error(rw, "failed to persist data", http.StatusInternalServerError)
+		return
+	}
 	respString, err := url.JoinPath(a.appConfig.FlagShortAddr, genShortStr)
 	if err != nil {
 		http.Error(rw, "failed to process request", http.StatusBadRequest)
@@ -90,6 +104,13 @@ func (a *app) JSONHandler(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "failed to process request", http.StatusBadRequest)
 		return
 	}
+	id := uuid.New()
+	fileURL := &URL{
+		id,
+		genShortStr,
+		reqURL.ReqURL,
+	}
+	err = a.fWriter.WriteFile(fileURL)
 	result.Result = respString
 	resp, err := json.Marshal(result)
 	if err != nil {
