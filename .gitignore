@@ -22,5 +22,5 @@ vendor/
 .idea
 .vscode
 
-internal/app/tmp
-tmp
+internal/app/tmp/*
+tmp/*

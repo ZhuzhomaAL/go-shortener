@@ -111,6 +111,10 @@ func (a *app) JSONHandler(rw http.ResponseWriter, req *http.Request) {
 		reqURL.ReqURL,
 	}
 	err = a.fWriter.WriteFile(fileURL)
+	if err != nil {
+		http.Error(rw, "failed to persist data", http.StatusInternalServerError)
+		return
+	}
 	result.Result = respString
 	resp, err := json.Marshal(result)
 	if err != nil {
