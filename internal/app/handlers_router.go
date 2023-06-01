@@ -18,6 +18,7 @@ func Router(appConfig config.AppConfig, log logger.MyLogger) chi.Router {
 	}
 
 	r := chi.NewRouter()
+	r.Use(gzipMiddleware)
 	r.Use(log.RequestLogger)
 	r.Post("/", app.postHandler)
 	r.Post("/api/shorten", app.JSONHandler)
