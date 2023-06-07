@@ -11,25 +11,25 @@ type MyLogger struct {
 	L *zap.Logger
 }
 
-func (l *MyLogger) Initialize(level string) error {
+func Initialize(level string) (MyLogger, error) {
+	l := MyLogger{}
 	lvl, err := zap.ParseAtomicLevel(level)
 	if err != nil {
-		return err
+		return l, err
 	}
 	cfg := zap.NewProductionConfig()
 	cfg.Level = lvl
 	zl, err := cfg.Build()
 	if err != nil {
-		return err
+		return l, err
 	}
 	l.L = zl
-	return nil
+	return l, err
 }
 
 func (l *MyLogger) RequestLogger(h http.Handler) http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			start := time.Now()
 			responseData := &responseData{
 				status: 0,
 				size:   0,
@@ -38,6 +38,7 @@ func (l *MyLogger) RequestLogger(h http.Handler) http.Handler {
 				ResponseWriter: w,
 				responseData:   responseData,
 			}
+			start := time.Now()
 			h.ServeHTTP(&lw, r)
 			l.L.Info(
 				"got incoming HTTP request",

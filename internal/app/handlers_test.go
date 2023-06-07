@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -19,12 +20,19 @@ var ts *httptest.Server
 
 func TestMain(m *testing.M) {
 	appConfig := config.ParseFlags()
-	l := logger.MyLogger{}
-	err := l.Initialize(appConfig.FlagLogLevel)
+	l, err := logger.Initialize(appConfig.FlagLogLevel)
 	if err != nil {
 		return
 	}
-	ts = httptest.NewServer(Router(appConfig, l))
+	err = os.MkdirAll("tmp", 0750)
+	if err != nil && !os.IsExist(err) {
+		log.Fatal(err)
+	}
+	r, err := Router(appConfig, l)
+	if err != nil {
+		log.Fatal(err)
+	}
+	ts = httptest.NewServer(r)
 	defer ts.Close()
 	status := m.Run()
 	os.Exit(status)
@@ -214,7 +222,6 @@ func TestJSONHandler(t *testing.T) {
 				resp, err := req.Send()
 				require.NoError(t, err)
 				urlList = sync.Map{}
-				t.Log(resp.StatusCode())
 				assert.Equal(t, tt.expectedStatus, resp.StatusCode(), "Код ответа не совпадает с ожидаемым")
 				if !tt.wantError {
 					require.NotEmpty(t, resp, "Тело ответа пустое")

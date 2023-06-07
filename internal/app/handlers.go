@@ -87,14 +87,14 @@ func (a *app) JSONHandler(rw http.ResponseWriter, req *http.Request) {
 	var reqURL reqURL
 	var result result
 
-	if req.Body == nil {
-		http.Error(rw, "request is empty, expected not empty", http.StatusBadRequest)
-		return
-	}
-
 	if err := json.NewDecoder(req.Body).Decode(&reqURL); err != nil {
-		http.Error(rw, err.Error(), http.StatusBadRequest)
-		return
+		if err == io.EOF {
+			http.Error(rw, "request is empty, expected not empty", http.StatusBadRequest)
+			return
+		} else {
+			log.Fatal(err)
+			return
+		}
 	}
 
 	genShortStr := uniuri.NewLen(8)
@@ -124,7 +124,7 @@ func (a *app) JSONHandler(rw http.ResponseWriter, req *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(http.StatusCreated)
 	if _, err := rw.Write(resp); err != nil {
-		log.Println(err)
+		http.Error(rw, "failed to retrieve response", http.StatusInternalServerError)
 		return
 	}
 }
