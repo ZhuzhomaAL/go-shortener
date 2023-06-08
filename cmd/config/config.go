@@ -17,7 +17,7 @@ func ParseFlags() AppConfig {
 	flag.StringVar(&appConfig.FlagRunAddr, "a", ":8080", "address and port to run server")
 	flag.StringVar(&appConfig.FlagShortAddr, "b", "http://localhost:8080", "address and port before short url")
 	flag.StringVar(&appConfig.FlagLogLevel, "l", "info", "log level")
-	flag.StringVar(&appConfig.FlagStorage, "f", "tmp/short-url-db.json", "json file address")
+	flag.StringVar(&appConfig.FlagStorage, "f", "/tmp/short-url-db.json", "json file address")
 	flag.Parse()
 
 	if envRunAddr := os.Getenv("SERVER_ADDRESS"); envRunAddr != "" {
