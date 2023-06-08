@@ -36,7 +36,8 @@ func (a *app) postHandler(rw http.ResponseWriter, req *http.Request) {
 	rw.Header().Set("Content-Type", "text/plain")
 	resp, err := io.ReadAll(req.Body)
 	if err != nil {
-		http.Error(rw, "failed to process request", http.StatusBadRequest)
+		a.log.L.Error("failed to process request")
+		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 		return
 	}
 	if len(resp) == 0 {
@@ -53,12 +54,14 @@ func (a *app) postHandler(rw http.ResponseWriter, req *http.Request) {
 	}
 	err = a.fWriter.WriteFile(fileURL)
 	if err != nil {
-		http.Error(rw, "failed to persist data", http.StatusInternalServerError)
+		a.log.L.Error("failed to persist data")
+		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 		return
 	}
 	respString, err := url.JoinPath(a.appConfig.FlagShortAddr, genShortStr)
 	if err != nil {
-		http.Error(rw, "failed to process request", http.StatusBadRequest)
+		a.log.L.Error("failed to process request")
+		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 		return
 	}
 	rw.WriteHeader(http.StatusCreated)
@@ -91,9 +94,6 @@ func (a *app) JSONHandler(rw http.ResponseWriter, req *http.Request) {
 		if err == io.EOF {
 			http.Error(rw, "request is empty, expected not empty", http.StatusBadRequest)
 			return
-		} else {
-			log.Fatal(err)
-			return
 		}
 	}
 
@@ -101,7 +101,8 @@ func (a *app) JSONHandler(rw http.ResponseWriter, req *http.Request) {
 	urlList.Store(genShortStr, reqURL.ReqURL)
 	respString, err := url.JoinPath(a.appConfig.FlagShortAddr, genShortStr)
 	if err != nil {
-		http.Error(rw, "failed to process request", http.StatusBadRequest)
+		a.log.L.Error("failed to process request")
+		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 		return
 	}
 	id := uuid.New()
@@ -112,19 +113,22 @@ func (a *app) JSONHandler(rw http.ResponseWriter, req *http.Request) {
 	}
 	err = a.fWriter.WriteFile(fileURL)
 	if err != nil {
-		http.Error(rw, "failed to persist data", http.StatusInternalServerError)
+		a.log.L.Error("failed to persist data")
+		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 		return
 	}
 	result.Result = respString
 	resp, err := json.Marshal(result)
 	if err != nil {
-		http.Error(rw, "failed to process request", http.StatusInternalServerError)
+		a.log.L.Error("failed to process request")
+		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 		return
 	}
 	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(http.StatusCreated)
 	if _, err := rw.Write(resp); err != nil {
-		http.Error(rw, "failed to retrieve response", http.StatusInternalServerError)
+		a.log.L.Error("failed to retrieve response")
+		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 		return
 	}
 }

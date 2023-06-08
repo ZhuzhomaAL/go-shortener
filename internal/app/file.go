@@ -29,9 +29,9 @@ func NewFileWriter(fileName string) (*Writer, error) {
 	}, nil
 }
 
-func (w *Writer) WriteFile(file *URL) error {
+func (w *Writer) WriteFile(URL *URL) error {
 
-	return w.encoder.Encode(&file)
+	return w.encoder.Encode(&URL)
 }
 
 func (w *Writer) Close() error {

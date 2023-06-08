@@ -7,7 +7,6 @@ import (
 	"go.uber.org/zap"
 	"log"
 	"net/http"
-	"os"
 )
 
 func main() {
@@ -21,10 +20,6 @@ func run(appConfig config.AppConfig) error {
 	l, err := logger.Initialize(appConfig.FlagLogLevel)
 	if err != nil {
 		return err
-	}
-	err = os.MkdirAll("tmp", 0750)
-	if err != nil && !os.IsExist(err) {
-		log.Fatal(err)
 	}
 	l.L.Info("Running server", zap.String("address", appConfig.FlagRunAddr))
 	r, err := app.Router(appConfig, l)
