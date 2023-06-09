@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"github.com/ZhuzhomaAL/go-shortener/cmd/config"
 	"github.com/ZhuzhomaAL/go-shortener/internal/logger"
 	"github.com/go-chi/chi/v5"
@@ -13,31 +14,39 @@ var urlList sync.Map
 
 func Router(appConfig config.AppConfig, logger logger.MyLogger) (chi.Router, error) {
 	urlList = sync.Map{}
-	fWriter, err := NewFileWriter(appConfig.FlagStorage)
-	if err != nil {
-		return nil, err
-	}
-	fReader, err := NewFileReader(appConfig.FlagStorage)
-	if err != nil {
-		return nil, err
-	}
 	app := &app{
 		appConfig: appConfig,
 		log:       logger,
-		fWriter:   fWriter,
-		fReader:   fReader,
+		fWriter:   nil,
+		fReader:   nil,
 	}
-	for {
-		url, err := app.fReader.ReadFile()
+	if appConfig.FlagStorage != "" {
+		fWriter, err := NewFileWriter(appConfig.FlagStorage)
 		if err != nil {
-			if err == io.EOF {
-				break
-			} else {
-				return nil, err
-			}
+			return nil, err
 		}
-		urlList.Store(url.ShortURL, url.OriginalURL)
+		fReader, err := NewFileReader(appConfig.FlagStorage)
+		if err != nil {
+			return nil, err
+		}
+
+		app.fWriter = fWriter
+		app.fReader = fReader
+
+		for {
+			url, err := app.fReader.ReadFile()
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				return nil, fmt.Errorf("failed to read the storage file: %w", err)
+
+			}
+			urlList.Store(url.ShortURL, url.OriginalURL)
+		}
+
 	}
+
 	r := chi.NewRouter()
 	r.Use(gzipMiddleware)
 	r.Use(logger.RequestLogger)
