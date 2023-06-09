@@ -3,6 +3,8 @@ package main
 import (
 	"github.com/ZhuzhomaAL/go-shortener/cmd/config"
 	"github.com/ZhuzhomaAL/go-shortener/internal/app"
+	"github.com/ZhuzhomaAL/go-shortener/internal/logger"
+	"go.uber.org/zap"
 	"log"
 	"net/http"
 )
@@ -15,6 +17,14 @@ func main() {
 }
 
 func run(appConfig config.AppConfig) error {
-	log.Println("Running server on", appConfig.FlagRunAddr)
-	return http.ListenAndServe(appConfig.FlagRunAddr, app.Router(appConfig))
+	l, err := logger.Initialize(appConfig.FlagLogLevel)
+	if err != nil {
+		return err
+	}
+	l.L.Info("Running server", zap.String("address", appConfig.FlagRunAddr))
+	r, err := app.Router(appConfig, l)
+	if err != nil {
+		return err
+	}
+	return http.ListenAndServe(appConfig.FlagRunAddr, r)
 }
