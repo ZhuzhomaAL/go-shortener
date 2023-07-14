@@ -16,14 +16,16 @@ func main() {
 
 	db, err := sql.Open("postgres", appConfig.FlagDB)
 	if err != nil {
-		log.Fatal(err)
+		db = nil
 	}
-	defer db.Close()
+	if db != nil {
+		defer db.Close()
+	}
 
-	err = db.Ping()
-	if err != nil {
-		log.Fatal(err)
-	}
+	//err = db.Ping()
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
 	if err := run(appConfig, db); err != nil {
 		log.Fatal(err)
 	}
