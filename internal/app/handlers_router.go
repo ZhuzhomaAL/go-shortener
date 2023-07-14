@@ -1,10 +1,12 @@
 package app
 
 import (
+	"database/sql"
 	"fmt"
 	"github.com/ZhuzhomaAL/go-shortener/cmd/config"
 	"github.com/ZhuzhomaAL/go-shortener/internal/logger"
 	"github.com/go-chi/chi/v5"
+	_ "github.com/lib/pq"
 	"io"
 	"net/http"
 	"sync"
@@ -12,13 +14,15 @@ import (
 
 var urlList sync.Map
 
-func Router(appConfig config.AppConfig, logger logger.MyLogger) (chi.Router, error) {
+func Router(appConfig config.AppConfig, logger logger.MyLogger, db *sql.DB) (chi.Router, error) {
+
 	urlList = sync.Map{}
 	app := &app{
 		appConfig: appConfig,
 		log:       logger,
 		fWriter:   nil,
 		fReader:   nil,
+		db:        db,
 	}
 	if appConfig.FlagStorage != "" {
 		fWriter, err := NewFileWriter(appConfig.FlagStorage)
@@ -58,6 +62,7 @@ func Router(appConfig config.AppConfig, logger logger.MyLogger) (chi.Router, err
 			app.getHandler(rw, req, id)
 		},
 	)
+	r.Get("/ping", app.pingDBHandler)
 
 	return r, nil
 }

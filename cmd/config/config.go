@@ -10,6 +10,7 @@ type AppConfig struct {
 	FlagShortAddr string
 	FlagLogLevel  string
 	FlagStorage   string
+	FlagDB        string
 }
 
 func ParseFlags() AppConfig {
@@ -18,6 +19,9 @@ func ParseFlags() AppConfig {
 	flag.StringVar(&appConfig.FlagShortAddr, "b", "http://localhost:8080", "address and port before short url")
 	flag.StringVar(&appConfig.FlagLogLevel, "l", "info", "log level")
 	flag.StringVar(&appConfig.FlagStorage, "f", "/tmp/short-url-db.json", "json file address")
+	flag.StringVar(
+		&appConfig.FlagDB, "d", "host=localhost user=postgres password=345973 dbname=postgres sslmode=disable", "database connection",
+	)
 	flag.Parse()
 
 	if envRunAddr := os.Getenv("SERVER_ADDRESS"); envRunAddr != "" {
@@ -34,6 +38,10 @@ func ParseFlags() AppConfig {
 
 	if envStorage := os.Getenv("FILE_STORAGE_PATH"); envStorage != "" {
 		appConfig.FlagStorage = envStorage
+	}
+
+	if envDB := os.Getenv("DATABASE_DSN"); envDB != "" {
+		appConfig.FlagDB = envDB
 	}
 
 	return appConfig

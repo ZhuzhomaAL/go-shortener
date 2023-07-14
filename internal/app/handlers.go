@@ -1,6 +1,7 @@
 package app
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/ZhuzhomaAL/go-shortener/cmd/config"
@@ -19,6 +20,7 @@ type app struct {
 	log       logger.MyLogger
 	fWriter   *Writer
 	fReader   *Reader
+	db        *sql.DB
 }
 
 type result struct {
@@ -140,4 +142,14 @@ func (a *app) JSONHandler(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 		return
 	}
+}
+
+func (a *app) pingDBHandler(rw http.ResponseWriter, req *http.Request) {
+	err := a.db.Ping()
+	if err != nil {
+		a.log.L.Error("failed to connect to database", zap.Error(err))
+		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
+	}
+	rw.WriteHeader(http.StatusOK)
+	return
 }

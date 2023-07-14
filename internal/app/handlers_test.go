@@ -1,6 +1,7 @@
 package app
 
 import (
+	"database/sql"
 	"github.com/ZhuzhomaAL/go-shortener/cmd/config"
 	"github.com/ZhuzhomaAL/go-shortener/internal/logger"
 	"github.com/go-resty/resty/v2"
@@ -20,6 +21,16 @@ var ts *httptest.Server
 
 func TestMain(m *testing.M) {
 	appConfig := config.ParseFlags()
+	db, err := sql.Open("postgres", appConfig.FlagDB)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		log.Fatal(err)
+	}
 	l, err := logger.Initialize(appConfig.FlagLogLevel)
 	if err != nil {
 		return
@@ -28,7 +39,7 @@ func TestMain(m *testing.M) {
 	if err != nil && !os.IsExist(err) {
 		log.Fatal(err)
 	}
-	r, err := Router(appConfig, l)
+	r, err := Router(appConfig, l, db)
 	if err != nil {
 		log.Fatal(err)
 	}
