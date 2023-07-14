@@ -21,21 +21,12 @@ var ts *httptest.Server
 
 func TestMain(m *testing.M) {
 	appConfig := config.ParseFlags()
-	var db *sql.DB
+	db := getTestConnection(appConfig.FlagDB)
 
-	if appConfig.FlagDB != "" {
-		db, err := sql.Open("postgres", appConfig.FlagDB)
-		if err != nil {
-			log.Fatal(err)
-		}
-
+	if db != nil {
 		defer db.Close()
-
-		err = db.Ping()
-		if err != nil {
-			log.Fatal(err)
-		}
 	}
+
 	l, err := logger.Initialize(appConfig.FlagLogLevel)
 	if err != nil {
 		return
@@ -53,6 +44,24 @@ func TestMain(m *testing.M) {
 	status := m.Run()
 	os.Exit(status)
 }
+func getTestConnection(dsnString string) *sql.DB {
+	if dsnString == "" {
+		return nil
+	}
+
+	db, err := sql.Open("postgres", dsnString)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = db.Ping()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return db
+}
+
 func testRequest(t *testing.T, ts *httptest.Server, method, path string, body string) (*http.Response, string) {
 	req, err := http.NewRequest(method, ts.URL+path, strings.NewReader(body))
 	require.NoError(t, err)

@@ -11,27 +11,35 @@ import (
 )
 
 func main() {
-
 	appConfig := config.ParseFlags()
-	var db *sql.DB
 
-	if appConfig.FlagDB != "" {
-		db, err := sql.Open("postgres", appConfig.FlagDB)
-		if err != nil {
-			log.Fatal(err)
-		}
+	db := getConnection(appConfig.FlagDB)
 
+	if db != nil {
 		defer db.Close()
-
-		err = db.Ping()
-		if err != nil {
-			log.Fatal(err)
-		}
 	}
 
 	if err := run(appConfig, db); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func getConnection(dsnString string) *sql.DB {
+	if dsnString == "" {
+		return nil
+	}
+
+	db, err := sql.Open("postgres", dsnString)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = db.Ping()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return db
 }
 
 func run(appConfig config.AppConfig, db *sql.DB) error {
