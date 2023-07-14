@@ -151,5 +151,4 @@ func (a *app) pingDBHandler(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 	}
 	rw.WriteHeader(http.StatusOK)
-	return
 }
