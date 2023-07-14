@@ -20,7 +20,7 @@ func ParseFlags() AppConfig {
 	flag.StringVar(&appConfig.FlagLogLevel, "l", "info", "log level")
 	flag.StringVar(&appConfig.FlagStorage, "f", "/tmp/short-url-db.json", "json file address")
 	flag.StringVar(
-		&appConfig.FlagDB, "d", "host=localhost user=postgres password=345973 dbname=postgres sslmode=disable", "database connection",
+		&appConfig.FlagDB, "d", "", "database connection",
 	)
 	flag.Parse()
 

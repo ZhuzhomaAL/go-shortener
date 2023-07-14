@@ -13,19 +13,22 @@ import (
 func main() {
 
 	appConfig := config.ParseFlags()
+	var db *sql.DB
 
-	db, err := sql.Open("postgres", appConfig.FlagDB)
-	if err != nil {
-		db = nil
-	}
-	if db != nil {
+	if appConfig.FlagDB != "" {
+		db, err := sql.Open("postgres", appConfig.FlagDB)
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		defer db.Close()
+
+		err = db.Ping()
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
-	//err = db.Ping()
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
 	if err := run(appConfig, db); err != nil {
 		log.Fatal(err)
 	}

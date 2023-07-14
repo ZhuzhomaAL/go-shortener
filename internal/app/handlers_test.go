@@ -21,18 +21,21 @@ var ts *httptest.Server
 
 func TestMain(m *testing.M) {
 	appConfig := config.ParseFlags()
-	db, err := sql.Open("postgres", appConfig.FlagDB)
-	if err != nil {
-		db = nil
-	}
-	if db != nil {
-		defer db.Close()
-	}
+	var db *sql.DB
 
-	//err = db.Ping()
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
+	if appConfig.FlagDB != "" {
+		db, err := sql.Open("postgres", appConfig.FlagDB)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		defer db.Close()
+
+		err = db.Ping()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 	l, err := logger.Initialize(appConfig.FlagLogLevel)
 	if err != nil {
 		return
