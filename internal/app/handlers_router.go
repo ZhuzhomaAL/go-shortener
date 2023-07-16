@@ -55,7 +55,12 @@ func Router(appConfig config.AppConfig, logger logger.MyLogger, db *sql.DB) (chi
 	r.Use(gzipMiddleware)
 	r.Use(logger.RequestLogger)
 	r.Post("/", app.postHandler)
-	r.Post("/api/shorten", app.JSONHandler)
+	r.Route(
+		"/api/shorten", func(r chi.Router) {
+			r.Post("/", app.JSONHandler)
+			r.Post("/batch", app.batchHandler)
+		},
+	)
 	r.Get(
 		"/{id}", func(rw http.ResponseWriter, req *http.Request) {
 			id := chi.URLParam(req, "id")
