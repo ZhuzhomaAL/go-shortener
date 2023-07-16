@@ -3,11 +3,9 @@ package app
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"github.com/ZhuzhomaAL/go-shortener/cmd/config"
 	"github.com/ZhuzhomaAL/go-shortener/internal/logger"
 	"github.com/dchest/uniuri"
-	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"io"
 	"log"
@@ -48,20 +46,11 @@ func (a *app) postHandler(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 	genShortStr := uniuri.NewLen(8)
-	urlList.Store(genShortStr, string(resp))
-	id := uuid.New()
-	fileURL := &URL{
-		id,
-		genShortStr,
-		string(resp),
-	}
-	if a.fWriter != nil {
-		err = a.fWriter.WriteFile(fileURL)
-		if err != nil {
-			a.log.L.Error("failed to persist data", zap.Error(err))
-			http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
-			return
-		}
+	err = saveURL(a.db, a.fWriter, &urlList, genShortStr, string(resp))
+	if err != nil {
+		a.log.L.Error("failed to persist data", zap.Error(err))
+		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
+		return
 	}
 	respString, err := url.JoinPath(a.appConfig.FlagShortAddr, genShortStr)
 	if err != nil {
@@ -77,15 +66,14 @@ func (a *app) postHandler(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (a *app) getHandler(rw http.ResponseWriter, req *http.Request, id string) {
-	location, ok := urlList.Load(id)
-	locationStr := fmt.Sprintf("%v", location)
-	if !ok {
+	location, err := getURL(a.db, id)
+	if err != nil {
 		http.Error(rw, "location not found", http.StatusBadRequest)
 		return
 	}
-	rw.Header().Set("Location", locationStr)
+	rw.Header().Set("Location", location)
 	rw.WriteHeader(http.StatusTemporaryRedirect)
-	if _, err := rw.Write([]byte(locationStr)); err != nil {
+	if _, err := rw.Write([]byte(location)); err != nil {
 		log.Println(err)
 		return
 	}
@@ -105,26 +93,17 @@ func (a *app) JSONHandler(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	genShortStr := uniuri.NewLen(8)
-	urlList.Store(genShortStr, reqURL.ReqURL)
+	err := saveURL(a.db, a.fWriter, &urlList, genShortStr, reqURL.ReqURL)
+	if err != nil {
+		a.log.L.Error("failed to persist data", zap.Error(err))
+		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
+		return
+	}
 	respString, err := url.JoinPath(a.appConfig.FlagShortAddr, genShortStr)
 	if err != nil {
 		a.log.L.Error("failed to process request", zap.Error(err))
 		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 		return
-	}
-	id := uuid.New()
-	fileURL := &URL{
-		id,
-		genShortStr,
-		reqURL.ReqURL,
-	}
-	if a.fWriter != nil {
-		err = a.fWriter.WriteFile(fileURL)
-		if err != nil {
-			a.log.L.Error("failed to persist data", zap.Error(err))
-			http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
-			return
-		}
 	}
 	var result result
 

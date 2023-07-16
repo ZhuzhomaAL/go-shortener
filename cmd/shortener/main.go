@@ -13,7 +13,7 @@ import (
 func main() {
 	appConfig := config.ParseFlags()
 
-	db := getConnection(appConfig.FlagDB)
+	db := app.GetConnection(appConfig.FlagDB)
 
 	if db != nil {
 		defer db.Close()
@@ -22,24 +22,6 @@ func main() {
 	if err := run(appConfig, db); err != nil {
 		log.Fatal(err)
 	}
-}
-
-func getConnection(dsnString string) *sql.DB {
-	if dsnString == "" {
-		return nil
-	}
-
-	db, err := sql.Open("postgres", dsnString)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = db.Ping()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return db
 }
 
 func run(appConfig config.AppConfig, db *sql.DB) error {
@@ -52,5 +34,12 @@ func run(appConfig config.AppConfig, db *sql.DB) error {
 	if err != nil {
 		return err
 	}
+	if db != nil {
+		err = app.CreateShortURLTable(db)
+		if err != nil {
+			l.L.Error("failed to create short url table", zap.Error(err))
+		}
+	}
+
 	return http.ListenAndServe(appConfig.FlagRunAddr, r)
 }
