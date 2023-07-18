@@ -39,6 +39,10 @@ func run(appConfig config.AppConfig, db *sql.DB) error {
 		if err != nil {
 			l.L.Error("failed to create short url table", zap.Error(err))
 		}
+		err = app.CreateIndex(db)
+		if err != nil {
+			l.L.Error("failed to create short url index", zap.Error(err))
+		}
 	}
 
 	return http.ListenAndServe(appConfig.FlagRunAddr, r)

@@ -6,10 +6,12 @@ import (
 	"github.com/ZhuzhomaAL/go-shortener/cmd/config"
 	"github.com/ZhuzhomaAL/go-shortener/internal/logger"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	_ "github.com/lib/pq"
 	"io"
 	"net/http"
 	"sync"
+	"time"
 )
 
 var urlList sync.Map
@@ -54,6 +56,7 @@ func Router(appConfig config.AppConfig, logger logger.MyLogger, db *sql.DB) (chi
 	r := chi.NewRouter()
 	r.Use(gzipMiddleware)
 	r.Use(logger.RequestLogger)
+	r.Use(middleware.Timeout(10 * time.Second))
 	r.Post("/", app.postHandler)
 	r.Route(
 		"/api/shorten", func(r chi.Router) {

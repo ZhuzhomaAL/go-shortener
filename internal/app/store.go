@@ -8,16 +8,16 @@ import (
 	"github.com/google/uuid"
 	"strings"
 	"sync"
-	"time"
 )
 
-func saveURL(db *sql.DB, fWriter *Writer, urlList *sync.Map, shortURL string, fullURL string) error {
+func saveURL(ctx context.Context, db *sql.DB, fWriter *Writer, urlList *sync.Map, shortURL string, fullURL string) error {
 	switch {
 	case db != nil:
-		err := saveToDB(db, fullURL, shortURL)
+		err := saveToDB(ctx, db, fullURL, shortURL)
 		if err != nil {
 			return err
 		}
+		return nil
 	case fWriter != nil:
 		err := saveToFile(fWriter, shortURL, fullURL)
 		if err != nil {
@@ -33,9 +33,9 @@ func saveURL(db *sql.DB, fWriter *Writer, urlList *sync.Map, shortURL string, fu
 	return nil
 }
 
-func getURL(db *sql.DB, shortURL string) (string, error) {
+func getURL(ctx context.Context, db *sql.DB, shortURL string) (string, error) {
 	if db != nil {
-		return readFromDB(db, shortURL)
+		return getFullURLByShort(ctx, db, shortURL)
 	} else {
 		return readFromMemory(shortURL)
 	}
@@ -49,10 +49,10 @@ func readFromMemory(shortURL string) (string, error) {
 	return fmt.Sprintf("%v", fullURL), nil
 }
 
-func readFromDB(db *sql.DB, shortURL string) (string, error) {
+func getFullURLByShort(ctx context.Context, db *sql.DB, shortURL string) (string, error) {
 	var fullURL string
 	err := db.QueryRowContext(
-		context.Background(),
+		ctx,
 		`SELECT full_url FROM short_url WHERE short_url = $1`, shortURL,
 	).Scan(&fullURL)
 	if err != nil {
@@ -79,10 +79,8 @@ func saveToFile(writer *Writer, shortURL string, fullURL string) error {
 
 }
 
-func saveToDB(db *sql.DB, fullURL string, shortURL string) error {
+func saveToDB(ctx context.Context, db *sql.DB, fullURL string, shortURL string) error {
 	query := `INSERT INTO short_url(full_url, short_url) VALUES ($1, $2)`
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 	stmt, err := db.PrepareContext(ctx, query)
 	if err != nil {
 		return err
@@ -99,10 +97,10 @@ func saveToDB(db *sql.DB, fullURL string, shortURL string) error {
 	return nil
 }
 
-func saveBatch(db *sql.DB, fWriter *Writer, urlList *sync.Map, batchURL []batchURL) error {
+func saveBatch(ctx context.Context, db *sql.DB, fWriter *Writer, urlList *sync.Map, batchURL []batchURL) error {
 	switch {
 	case db != nil:
-		err := saveBatchToDB(db, batchURL)
+		err := saveBatchToDB(ctx, db, batchURL)
 		if err != nil {
 			return err
 		}
@@ -146,8 +144,9 @@ func saveBatchToFile(writer *Writer, batchURL []batchURL) error {
 	return nil
 }
 
-func saveBatchToDB(db *sql.DB, batchURL []batchURL) error {
-	query := "INSERT INTO short_url(full_url, short_url) VALUES "
+func saveBatchToDB(ctx context.Context, db *sql.DB, batchURL []batchURL) error {
+	query := "INSERT INTO short_url(full_url, short_url) VALUES ON CONFLICT(full_url) DO UPDATE SET full_url = excluded." +
+		"full_url RETURNING full_ur"
 	var inserts []string
 	var params []interface{}
 	var i int
@@ -158,8 +157,6 @@ func saveBatchToDB(db *sql.DB, batchURL []batchURL) error {
 	}
 	queryVals := strings.Join(inserts, ",")
 	query = query + queryVals
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 	stmt, err := db.PrepareContext(ctx, query)
 	if err != nil {
 		return err
@@ -174,4 +171,17 @@ func saveBatchToDB(db *sql.DB, batchURL []batchURL) error {
 		return err
 	}
 	return nil
+}
+
+func getShortURLByFull(ctx context.Context, db *sql.DB, fullURL string) (string, error) {
+	var shortURL string
+	err := db.QueryRowContext(
+		ctx,
+		`SELECT short_url FROM short_url WHERE full_url = $1`, fullURL,
+	).Scan(&shortURL)
+	if err != nil {
+		return "", err
+	}
+
+	return shortURL, nil
 }

@@ -37,3 +37,14 @@ func CreateShortURLTable(db *sql.DB) error {
 	}
 	return nil
 }
+
+func CreateIndex(db *sql.DB) error {
+	query := `CREATE UNIQUE INDEX IF NOT EXISTS full_url ON short_url(full_url)`
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := db.ExecContext(ctx, query)
+	if err != nil {
+		return err
+	}
+	return nil
+}
