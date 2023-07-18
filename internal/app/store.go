@@ -145,8 +145,7 @@ func saveBatchToFile(writer *Writer, batchURL []batchURL) error {
 }
 
 func saveBatchToDB(ctx context.Context, db *sql.DB, batchURL []batchURL) error {
-	query := "INSERT INTO short_url(full_url, short_url) VALUES ON CONFLICT(full_url) DO UPDATE SET full_url = excluded." +
-		"full_url RETURNING full_ur"
+	query := "INSERT INTO short_url(full_url, short_url) VALUES "
 	var inserts []string
 	var params []interface{}
 	var i int
