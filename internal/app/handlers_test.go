@@ -2,9 +2,12 @@ package app
 
 import (
 	"github.com/ZhuzhomaAL/go-shortener/cmd/config"
+	"github.com/ZhuzhomaAL/go-shortener/internal/logger"
+	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -17,7 +20,19 @@ var ts *httptest.Server
 
 func TestMain(m *testing.M) {
 	appConfig := config.ParseFlags()
-	ts = httptest.NewServer(Router(appConfig))
+	l, err := logger.Initialize(appConfig.FlagLogLevel)
+	if err != nil {
+		return
+	}
+	err = os.MkdirAll("tmp", 0750)
+	if err != nil && !os.IsExist(err) {
+		log.Fatal(err)
+	}
+	r, err := Router(appConfig, l)
+	if err != nil {
+		log.Fatal(err)
+	}
+	ts = httptest.NewServer(r)
 	defer ts.Close()
 	status := m.Run()
 	os.Exit(status)
@@ -160,6 +175,59 @@ func TestGetHandler_NegativeCases(t *testing.T) {
 					require.NotEmpty(t, respBody, "Тело ответа пустое")
 				} else {
 					require.Empty(t, respBody, "Тело ответа не пустое")
+				}
+			},
+		)
+	}
+}
+
+func TestJSONHandler(t *testing.T) {
+	tests := []struct {
+		name           string
+		method         string
+		expectedStatus int
+		body           string
+		baseURL        string
+		wantError      bool
+	}{
+		{
+			name:           "success_json_post_request",
+			method:         http.MethodPost,
+			expectedStatus: http.StatusCreated,
+			body:           "{\n  \"url\": \"https://practicum.yandex.ru\"\n} ",
+			baseURL:        "http://localhost:8080/",
+		},
+		{
+			name:           "get_method",
+			method:         http.MethodGet,
+			expectedStatus: http.StatusMethodNotAllowed,
+			wantError:      true,
+		},
+		{
+			name:           "empty body",
+			method:         http.MethodPost,
+			expectedStatus: http.StatusBadRequest,
+			wantError:      true,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(
+			tt.name, func(t *testing.T) {
+				req := resty.New().R()
+				req.Method = tt.method
+				req.URL = ts.URL + "/api/shorten"
+				req.SetHeader("Content-Type", "application/json")
+				req.SetBody(tt.body)
+				resp, err := req.Send()
+				require.NoError(t, err)
+				urlList = sync.Map{}
+				assert.Equal(t, tt.expectedStatus, resp.StatusCode(), "Код ответа не совпадает с ожидаемым")
+				if !tt.wantError {
+					require.NotEmpty(t, resp, "Тело ответа пустое")
+					rb := resp.Body()
+					require.True(t, strings.Contains(string(rb), tt.baseURL))
+					require.True(t, len(resp.Body()) > len(tt.baseURL))
 				}
 			},
 		)
