@@ -20,17 +20,17 @@ func (mr *MemoryReader) GetURL(ctx context.Context, shortURL string) (string, er
 }
 
 type MemoryWriter struct {
-	UrlList *sync.Map
+	URLList *sync.Map
 }
 
 func (mw *MemoryWriter) SaveURL(ctx context.Context, shortURL string, fullURL string) error {
-	mw.UrlList.Store(shortURL, fullURL)
+	mw.URLList.Store(shortURL, fullURL)
 	return nil
 }
 
 func (mw *MemoryWriter) SaveBatch(ctx context.Context, batchURL []URL) error {
 	for _, URL := range batchURL {
-		mw.UrlList.Store(URL.ShortURL, URL.OriginalURL)
+		mw.URLList.Store(URL.ShortURL, URL.OriginalURL)
 	}
 
 	return nil

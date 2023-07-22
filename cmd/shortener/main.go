@@ -39,7 +39,7 @@ func main() {
 		}
 		reader = &store.FileReader{MemoryReader: &memoryReader}
 		memoryWriter := store.MemoryWriter{
-			UrlList: &urlList,
+			URLList: &urlList,
 		}
 		fWriter, err := file.NewFileWriter(appConfig.FlagStorage)
 		if err != nil {
@@ -68,7 +68,7 @@ func main() {
 			URLList: &urlList,
 		}
 		writer = &store.MemoryWriter{
-			UrlList: &urlList,
+			URLList: &urlList,
 		}
 	}
 	myLogger, err := logger.Initialize(appConfig.FlagLogLevel)
