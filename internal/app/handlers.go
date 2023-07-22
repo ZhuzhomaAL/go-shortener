@@ -54,11 +54,10 @@ func (a *app) postHandler(rw http.ResponseWriter, req *http.Request) {
 			a.myLogger.L.Error("duplicate key value", zap.Error(err))
 			a.makeSinglePlainResponse(rw, err.ShortURL, http.StatusConflict)
 			return
-		} else {
-			a.myLogger.L.Error("failed to persist data", zap.Error(err))
-			http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
-			return
 		}
+		a.myLogger.L.Error("failed to persist data", zap.Error(err))
+		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
+		return
 	}
 	a.makeSinglePlainResponse(rw, genShortStr, http.StatusCreated)
 }
@@ -201,11 +200,10 @@ func (a *app) JSONHandler(rw http.ResponseWriter, req *http.Request) {
 			a.makeSingleJSONResponse(rw, err.ShortURL, http.StatusConflict)
 			return
 
-		} else {
-			a.myLogger.L.Error("failed to persist data", zap.Error(err))
-			http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
-			return
 		}
+		a.myLogger.L.Error("failed to persist data", zap.Error(err))
+		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
+		return
 	}
 
 	a.makeSingleJSONResponse(rw, genShortStr, http.StatusCreated)

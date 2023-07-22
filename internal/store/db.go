@@ -36,7 +36,7 @@ type DBWriter struct {
 }
 
 func (dbw *DBWriter) SaveURL(ctx context.Context, shortURL string, fullURL string) error {
-	query := `INSERT INTO short_url(full_url, short_url) VALUES `
+	query := `INSERT INTO short_url(full_url, short_url) VALUES ($1, $2)`
 	stmt, err := dbw.DB.PrepareContext(ctx, query)
 	if err != nil {
 		return err

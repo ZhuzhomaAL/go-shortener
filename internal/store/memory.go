@@ -8,11 +8,11 @@ import (
 )
 
 type MemoryReader struct {
-	UrlList *sync.Map
+	URLList *sync.Map
 }
 
 func (mr *MemoryReader) GetURL(ctx context.Context, shortURL string) (string, error) {
-	fullURL, ok := mr.UrlList.Load(shortURL)
+	fullURL, ok := mr.URLList.Load(shortURL)
 	if !ok {
 		return "", errors.New("failed to load fullURL from memory")
 	}

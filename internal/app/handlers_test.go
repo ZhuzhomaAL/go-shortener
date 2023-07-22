@@ -42,7 +42,7 @@ func TestMain(m *testing.M) {
 	case appConfig.FlagStorage != "":
 		urlList = sync.Map{}
 		memoryReader := store.MemoryReader{
-			UrlList: &urlList,
+			URLList: &urlList,
 		}
 		reader = &store.FileReader{MemoryReader: &memoryReader}
 		memoryWriter := store.MemoryWriter{
@@ -76,7 +76,7 @@ func TestMain(m *testing.M) {
 	default:
 		urlList = sync.Map{}
 		reader = &store.MemoryReader{
-			UrlList: &urlList,
+			URLList: &urlList,
 		}
 		writer = &store.MemoryWriter{
 			UrlList: &urlList,
