@@ -1,13 +1,11 @@
 package app
 
 import (
-	"database/sql"
 	"encoding/json"
 	"github.com/ZhuzhomaAL/go-shortener/cmd/config"
 	"github.com/ZhuzhomaAL/go-shortener/internal/logger"
+	"github.com/ZhuzhomaAL/go-shortener/internal/store"
 	"github.com/dchest/uniuri"
-	"github.com/jackc/pgerrcode"
-	"github.com/lib/pq"
 	"go.uber.org/zap"
 	"io"
 	"log"
@@ -17,10 +15,13 @@ import (
 
 type app struct {
 	appConfig config.AppConfig
-	log       logger.MyLogger
-	fWriter   *Writer
-	fReader   *Reader
-	db        *sql.DB
+	myLogger  logger.MyLogger
+	reader    store.Reader
+	writer    store.Writer
+}
+
+func NewApp(appConfig config.AppConfig, myLogger logger.MyLogger, reader store.Reader, writer store.Writer) *app {
+	return &app{appConfig: appConfig, myLogger: myLogger, reader: reader, writer: writer}
 }
 
 type result struct {
@@ -36,32 +37,25 @@ func (a *app) postHandler(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "request is empty, expected not empty", http.StatusBadRequest)
 		return
 	}
-	resp, err := io.ReadAll(req.Body)
+	request, err := io.ReadAll(req.Body)
 	if err != nil {
-		a.log.L.Error("failed to process request", zap.Error(err))
+		a.myLogger.L.Error("failed to process request", zap.Error(err))
 		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 		return
 	}
-	if len(resp) == 0 {
+	if len(request) == 0 {
 		http.Error(rw, "response body is empty, expected not empty", http.StatusBadRequest)
 		return
 	}
 	genShortStr := uniuri.NewLen(8)
-	err = saveURL(req.Context(), a.db, a.fWriter, &urlList, genShortStr, string(resp))
+	err = a.writer.SaveURL(req.Context(), genShortStr, string(request))
 	if err != nil {
-		if err, ok := err.(*pq.Error); ok && err.Code == pgerrcode.UniqueViolation {
-			a.log.L.Error("duplicate key value", zap.Error(err))
-			short, err := getShortURLByFull(req.Context(), a.db, string(resp))
-			if err != nil {
-				a.log.L.Error("failed to persist data", zap.Error(err))
-				http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
-				return
-			}
-			a.makeSinglePlainResponse(rw, short, http.StatusConflict)
+		if err, ok := err.(*store.ConflictError); ok {
+			a.myLogger.L.Error("duplicate key value", zap.Error(err))
+			a.makeSinglePlainResponse(rw, err.ShortURL, http.StatusConflict)
 			return
-
 		} else {
-			a.log.L.Error("failed to persist data", zap.Error(err))
+			a.myLogger.L.Error("failed to persist data", zap.Error(err))
 			http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 			return
 		}
@@ -72,7 +66,7 @@ func (a *app) postHandler(rw http.ResponseWriter, req *http.Request) {
 func (a *app) makeSinglePlainResponse(rw http.ResponseWriter, genShortStr string, status int) {
 	respString, err := url.JoinPath(a.appConfig.FlagShortAddr, genShortStr)
 	if err != nil {
-		a.log.L.Error("failed to process request", zap.Error(err))
+		a.myLogger.L.Error("failed to process request", zap.Error(err))
 		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 		return
 	}
@@ -85,7 +79,7 @@ func (a *app) makeSinglePlainResponse(rw http.ResponseWriter, genShortStr string
 }
 
 func (a *app) getHandler(rw http.ResponseWriter, req *http.Request, id string) {
-	location, err := getURL(req.Context(), a.db, id)
+	location, err := a.reader.GetURL(req.Context(), id)
 	if err != nil {
 		http.Error(rw, "location not found", http.StatusBadRequest)
 		return
@@ -99,12 +93,17 @@ func (a *app) getHandler(rw http.ResponseWriter, req *http.Request, id string) {
 }
 
 func (a *app) pingDBHandler(rw http.ResponseWriter, req *http.Request) {
-	err := a.db.Ping()
-	if err != nil {
-		a.log.L.Error("failed to connect to database", zap.Error(err))
-		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
+	if reader, ok := a.reader.(*store.DBReader); ok {
+		err := reader.Ping(req.Context())
+		if err != nil {
+			a.myLogger.L.Error("failed to connect to database", zap.Error(err))
+			http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
+		}
+		rw.WriteHeader(http.StatusOK)
+		return
 	}
-	rw.WriteHeader(http.StatusOK)
+	a.myLogger.L.Error("failed to connect to database")
+	http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 }
 
 type batchRes struct {
@@ -130,18 +129,25 @@ func (a *app) batchHandler(rw http.ResponseWriter, req *http.Request) {
 				http.Error(rw, "request is empty, expected not empty", http.StatusBadRequest)
 				return
 			}
-			a.log.L.Error("failed to decode request", zap.Error(err))
+			a.myLogger.L.Error("failed to decode request", zap.Error(err))
 			http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 			return
 		}
 
 	}
+	var URLs []store.URL
 	for i := range batchURL {
 		batchURL[i].ShortURL = uniuri.NewLen(8)
+		URL := store.URL{
+			OriginalURL: batchURL[i].OriginalURL,
+			ShortURL:    batchURL[i].ShortURL,
+		}
+		URLs = append(URLs, URL)
+
 	}
-	err := saveBatch(req.Context(), a.db, a.fWriter, &urlList, batchURL)
+	err := a.writer.SaveBatch(req.Context(), URLs)
 	if err != nil {
-		a.log.L.Error("failed to persist data", zap.Error(err))
+		a.myLogger.L.Error("failed to persist data", zap.Error(err))
 		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 		return
 	}
@@ -152,7 +158,7 @@ func (a *app) batchHandler(rw http.ResponseWriter, req *http.Request) {
 		resItem.ID = URL.ID
 		respString, err := url.JoinPath(a.appConfig.FlagShortAddr, URL.ShortURL)
 		if err != nil {
-			a.log.L.Error("failed to process request", zap.Error(err))
+			a.myLogger.L.Error("failed to process request", zap.Error(err))
 			http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 			return
 		}
@@ -161,14 +167,14 @@ func (a *app) batchHandler(rw http.ResponseWriter, req *http.Request) {
 	}
 	resp, err := json.Marshal(result)
 	if err != nil {
-		a.log.L.Error("failed to process request", zap.Error(err))
+		a.myLogger.L.Error("failed to process request", zap.Error(err))
 		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 		return
 	}
 	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(http.StatusCreated)
 	if _, err := rw.Write(resp); err != nil {
-		a.log.L.Error("failed to retrieve response", zap.Error(err))
+		a.myLogger.L.Error("failed to retrieve response", zap.Error(err))
 		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 		return
 	}
@@ -182,27 +188,21 @@ func (a *app) JSONHandler(rw http.ResponseWriter, req *http.Request) {
 			http.Error(rw, "request is empty, expected not empty", http.StatusBadRequest)
 			return
 		}
-		a.log.L.Error("failed to decode request", zap.Error(err))
+		a.myLogger.L.Error("failed to decode request", zap.Error(err))
 		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 		return
 	}
 
 	genShortStr := uniuri.NewLen(8)
-	err := saveURL(req.Context(), a.db, a.fWriter, &urlList, genShortStr, reqURL.ReqURL)
+	err := a.writer.SaveURL(req.Context(), genShortStr, reqURL.ReqURL)
 	if err != nil {
-		if err, ok := err.(*pq.Error); ok && err.Code == pgerrcode.UniqueViolation {
-			a.log.L.Error("duplicate key value", zap.Error(err))
-			short, err := getShortURLByFull(req.Context(), a.db, reqURL.ReqURL)
-			if err != nil {
-				a.log.L.Error("failed to persist data", zap.Error(err))
-				http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
-				return
-			}
-			a.makeSingleJSONResponse(rw, short, http.StatusConflict)
+		if err, ok := err.(*store.ConflictError); ok {
+			a.myLogger.L.Error("duplicate key value", zap.Error(err))
+			a.makeSingleJSONResponse(rw, err.ShortURL, http.StatusConflict)
 			return
 
 		} else {
-			a.log.L.Error("failed to persist data", zap.Error(err))
+			a.myLogger.L.Error("failed to persist data", zap.Error(err))
 			http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 			return
 		}
@@ -214,7 +214,7 @@ func (a *app) JSONHandler(rw http.ResponseWriter, req *http.Request) {
 func (a *app) makeSingleJSONResponse(rw http.ResponseWriter, genShortStr string, status int) {
 	respString, err := url.JoinPath(a.appConfig.FlagShortAddr, genShortStr)
 	if err != nil {
-		a.log.L.Error("failed to process request", zap.Error(err))
+		a.myLogger.L.Error("failed to process request", zap.Error(err))
 		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 		return
 	}
@@ -223,14 +223,14 @@ func (a *app) makeSingleJSONResponse(rw http.ResponseWriter, genShortStr string,
 	result.Result = respString
 	resp, err := json.Marshal(result)
 	if err != nil {
-		a.log.L.Error("failed to process request", zap.Error(err))
+		a.myLogger.L.Error("failed to process request", zap.Error(err))
 		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 		return
 	}
 	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(status)
 	if _, err := rw.Write(resp); err != nil {
-		a.log.L.Error("failed to retrieve response", zap.Error(err))
+		a.myLogger.L.Error("failed to retrieve response", zap.Error(err))
 		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 		return
 	}

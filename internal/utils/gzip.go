@@ -1,4 +1,4 @@
-package app
+package utils
 
 import (
 	"compress/gzip"
@@ -63,7 +63,7 @@ func (c *gzipReader) Close() error {
 	return c.zr.Close()
 }
 
-func gzipMiddleware(next http.Handler) http.Handler {
+func GzipMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, req *http.Request) {
 			oldw := w

@@ -1,49 +1,88 @@
 package main
 
 import (
-	"database/sql"
+	"fmt"
 	"github.com/ZhuzhomaAL/go-shortener/cmd/config"
 	"github.com/ZhuzhomaAL/go-shortener/internal/app"
+	"github.com/ZhuzhomaAL/go-shortener/internal/file"
 	"github.com/ZhuzhomaAL/go-shortener/internal/logger"
+	"github.com/ZhuzhomaAL/go-shortener/internal/postgres"
+	"github.com/ZhuzhomaAL/go-shortener/internal/store"
 	"go.uber.org/zap"
+	"io"
 	"log"
 	"net/http"
+	"sync"
 )
+
+var urlList sync.Map
 
 func main() {
 	appConfig := config.ParseFlags()
+	var reader store.Reader
+	var writer store.Writer
 
-	db := app.GetConnection(appConfig.FlagDB)
-
-	if db != nil {
+	switch {
+	case appConfig.FlagDB != "":
+		db := postgres.GetConnection(appConfig.FlagDB)
 		defer db.Close()
+		err := postgres.InitializeDB(db)
+		if err != nil {
+			log.Fatal(err)
+		}
+		reader = &store.DBReader{DB: db}
+		writer = &store.DBWriter{DB: db}
+	case appConfig.FlagStorage != "":
+		urlList = sync.Map{}
+		memoryReader := store.MemoryReader{
+			UrlList: &urlList,
+		}
+		reader = &store.FileReader{MemoryReader: &memoryReader}
+		memoryWriter := store.MemoryWriter{
+			UrlList: &urlList,
+		}
+		fWriter, err := file.NewFileWriter(appConfig.FlagStorage)
+		if err != nil {
+			log.Fatal(err)
+		}
+		writer = &store.FileWriter{
+			MemoryWriter: &memoryWriter, Writer: fWriter,
+		}
+		fReader, err := file.NewFileReader(appConfig.FlagStorage)
+		if err != nil {
+			log.Fatal(err)
+		}
+		for {
+			url, err := fReader.ReadFile()
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				log.Fatal(fmt.Errorf("failed to read the storage file: %w", err))
+			}
+			urlList.Store(url.ShortURL, url.OriginalURL)
+		}
+	default:
+		urlList = sync.Map{}
+		reader = &store.MemoryReader{
+			UrlList: &urlList,
+		}
+		writer = &store.MemoryWriter{
+			UrlList: &urlList,
+		}
 	}
-
-	if err := run(appConfig, db); err != nil {
+	myLogger, err := logger.Initialize(appConfig.FlagLogLevel)
+	if err != nil {
 		log.Fatal(err)
 	}
-}
-
-func run(appConfig config.AppConfig, db *sql.DB) error {
-	l, err := logger.Initialize(appConfig.FlagLogLevel)
+	a := app.NewApp(appConfig, myLogger, reader, writer)
+	r, err := app.Router(a)
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
-	l.L.Info("Running server", zap.String("address", appConfig.FlagRunAddr))
-	r, err := app.Router(appConfig, l, db)
+	myLogger.L.Info("Running server", zap.String("address", appConfig.FlagRunAddr))
+	err = http.ListenAndServe(appConfig.FlagRunAddr, r)
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
-	if db != nil {
-		err = app.CreateShortURLTable(db)
-		if err != nil {
-			l.L.Error("failed to create short url table", zap.Error(err))
-		}
-		err = app.CreateIndex(db)
-		if err != nil {
-			l.L.Error("failed to create short url index", zap.Error(err))
-		}
-	}
-
-	return http.ListenAndServe(appConfig.FlagRunAddr, r)
 }
