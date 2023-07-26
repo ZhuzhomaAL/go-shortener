@@ -45,6 +45,10 @@ func (dbr *DBReader) GetURLsByUserID(ctx context.Context, userID string) ([]URL,
 		}
 		urls = append(urls, u)
 	}
+	err = rows.Err()
+	if err != nil {
+		return urls, err
+	}
 
 	return urls, nil
 }

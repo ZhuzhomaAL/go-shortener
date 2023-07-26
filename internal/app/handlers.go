@@ -5,6 +5,7 @@ import (
 	"github.com/ZhuzhomaAL/go-shortener/cmd/config"
 	"github.com/ZhuzhomaAL/go-shortener/internal/logger"
 	"github.com/ZhuzhomaAL/go-shortener/internal/store"
+	"github.com/ZhuzhomaAL/go-shortener/internal/utils"
 	"github.com/dchest/uniuri"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -50,7 +51,7 @@ func (a *app) postHandler(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 	genShortStr := uniuri.NewLen(8)
-	userID, ok := req.Context().Value("user_id").(uuid.UUID)
+	userID, ok := req.Context().Value(utils.ContextUserID).(uuid.UUID)
 	if !ok {
 		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 		return
@@ -146,7 +147,7 @@ func (a *app) batchHandler(rw http.ResponseWriter, req *http.Request) {
 		}
 
 	}
-	userID, ok := req.Context().Value("user_id").(uuid.UUID)
+	userID, ok := req.Context().Value(utils.ContextUserID).(uuid.UUID)
 	if !ok {
 		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 		return
@@ -211,7 +212,7 @@ func (a *app) JSONHandler(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	genShortStr := uniuri.NewLen(8)
-	userID, ok := req.Context().Value("user_id").(uuid.UUID)
+	userID, ok := req.Context().Value(utils.ContextUserID).(uuid.UUID)
 	if !ok {
 		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 		return
@@ -273,7 +274,7 @@ func (a *app) getUserURLHandler(rw http.ResponseWriter, req *http.Request) {
 		a.myLogger.L.Error("reader can not read user ID")
 		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 	}
-	userID, ok := req.Context().Value("user_id").(uuid.UUID)
+	userID, ok := req.Context().Value(utils.ContextUserID).(uuid.UUID)
 	if !ok {
 		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 		return
@@ -309,7 +310,7 @@ func (a *app) getUserURLHandler(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 	rw.Header().Set("Content-Type", "application/json")
-	rw.WriteHeader(http.StatusCreated)
+	rw.WriteHeader(http.StatusOK)
 	if _, err := rw.Write(resp); err != nil {
 		a.myLogger.L.Error("failed to retrieve response", zap.Error(err))
 		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
