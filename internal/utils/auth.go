@@ -44,10 +44,10 @@ func AuthMiddleware(h http.Handler) http.Handler {
 			var id uuid.UUID
 			c, err := r.Cookie("token")
 			if err != nil {
-				//if r.URL.Path == "/api/user/urls" {
-				//	w.WriteHeader(http.StatusUnauthorized)
-				//	return
-				//}
+				if r.URL.Path == "/api/user/urls" {
+					w.WriteHeader(http.StatusNoContent)
+					return
+				}
 				if err == http.ErrNoCookie {
 					id = uuid.New()
 				} else {
