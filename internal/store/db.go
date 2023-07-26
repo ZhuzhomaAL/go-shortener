@@ -26,6 +26,29 @@ func (dbr *DBReader) GetURL(ctx context.Context, shortURL string) (string, error
 	return fullURL, nil
 }
 
+func (dbr *DBReader) GetURLsByUserID(ctx context.Context, userID string) ([]URL, error) {
+	urls := make([]URL, 0)
+	rows, err := dbr.DB.QueryContext(
+		ctx,
+		`SELECT full_url, short_url FROM short_url s WHERE s.user_id = $1`, userID,
+	)
+	if err != nil {
+		return urls, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var u URL
+		err := rows.Scan(&u.OriginalURL, &u.ShortURL)
+		if err != nil {
+			return urls, err
+		}
+		urls = append(urls, u)
+	}
+
+	return urls, nil
+}
+
 func (dbr *DBReader) Ping(ctx context.Context) error {
 
 	return dbr.DB.Ping()
@@ -35,17 +58,17 @@ type DBWriter struct {
 	DB *sql.DB
 }
 
-func (dbw *DBWriter) SaveURL(ctx context.Context, shortURL string, fullURL string) error {
-	query := `INSERT INTO short_url(full_url, short_url) VALUES ($1, $2)`
+func (dbw *DBWriter) SaveURL(ctx context.Context, URL URL) error {
+	query := `INSERT INTO short_url(full_url, short_url, user_id) VALUES ($1, $2, $3)`
 	stmt, err := dbw.DB.PrepareContext(ctx, query)
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
-	_, err = stmt.ExecContext(ctx, fullURL, shortURL)
+	_, err = stmt.ExecContext(ctx, URL.OriginalURL, URL.ShortURL, URL.UserID)
 	if err != nil {
 		if err, ok := err.(*pq.Error); ok && err.Code == pgerrcode.UniqueViolation {
-			short, err := getShortURLByFull(ctx, dbw.DB, fullURL)
+			short, err := getShortURLByFull(ctx, dbw.DB, URL.OriginalURL)
 			if err != nil {
 				return err
 			}
@@ -80,14 +103,14 @@ func (dbw *DBWriter) SaveBatch(ctx context.Context, batchURL []URL) error {
 		return err
 	}
 	for _, chunk := range chunks {
-		query := "INSERT INTO short_url(full_url, short_url) VALUES "
+		query := "INSERT INTO short_url(full_url, short_url, user_id) VALUES "
 		var inserts []string
 		var params []interface{}
 		var i int
 		for _, u := range chunk {
-			inserts = append(inserts, fmt.Sprintf("($%d, $%d)", i+1, i+2))
-			i = i + 2
-			params = append(params, u.OriginalURL, u.ShortURL)
+			inserts = append(inserts, fmt.Sprintf("($%d, $%d, $%d)", i+1, i+2, i+3))
+			i = i + 3
+			params = append(params, u.OriginalURL, u.ShortURL, u.UserID.String())
 		}
 		queryVals := strings.Join(inserts, ",")
 		query = query + queryVals

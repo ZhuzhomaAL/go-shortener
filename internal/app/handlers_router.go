@@ -13,6 +13,7 @@ func Router(app *app) (chi.Router, error) {
 	r := chi.NewRouter()
 	r.Use(utils.GzipMiddleware)
 	r.Use(app.myLogger.RequestLogger)
+	r.Use(utils.AuthMiddleware)
 	r.Use(middleware.Timeout(10 * time.Second))
 	r.Post("/", app.postHandler)
 	r.Route(
@@ -28,6 +29,7 @@ func Router(app *app) (chi.Router, error) {
 		},
 	)
 	r.Get("/ping", app.pingDBHandler)
+	r.Get("/api/user/urls", app.getUserURLHandler)
 
 	return r, nil
 }
