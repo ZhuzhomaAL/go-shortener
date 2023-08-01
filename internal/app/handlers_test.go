@@ -1,8 +1,13 @@
 package app
 
 import (
+	"database/sql"
+	"fmt"
 	"github.com/ZhuzhomaAL/go-shortener/cmd/config"
+	"github.com/ZhuzhomaAL/go-shortener/internal/file"
 	"github.com/ZhuzhomaAL/go-shortener/internal/logger"
+	"github.com/ZhuzhomaAL/go-shortener/internal/postgres"
+	"github.com/ZhuzhomaAL/go-shortener/internal/store"
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,18 +22,72 @@ import (
 )
 
 var ts *httptest.Server
+var urlList sync.Map
 
 func TestMain(m *testing.M) {
 	appConfig := config.ParseFlags()
-	l, err := logger.Initialize(appConfig.FlagLogLevel)
-	if err != nil {
-		return
+	var reader store.Reader
+	var writer store.Writer
+
+	switch {
+	case appConfig.FlagDB != "":
+		db := getTestConnection(appConfig.FlagDB)
+		defer db.Close()
+		err := postgres.InitializeDB(db)
+		if err != nil {
+			log.Fatal(err)
+		}
+		reader = &store.DBReader{DB: db}
+		writer = &store.DBWriter{DB: db}
+	case appConfig.FlagStorage != "":
+		urlList = sync.Map{}
+		memoryReader := store.MemoryReader{
+			URLList: &urlList,
+		}
+		reader = &store.FileReader{MemoryReader: &memoryReader}
+		memoryWriter := store.MemoryWriter{
+			URLList: &urlList,
+		}
+		fWriter, err := file.NewFileWriter(appConfig.FlagStorage)
+		if err != nil {
+			log.Fatal(err)
+		}
+		writer = &store.FileWriter{
+			MemoryWriter: &memoryWriter, Writer: fWriter,
+		}
+		fReader, err := file.NewFileReader(appConfig.FlagStorage)
+		if err != nil {
+			log.Fatal(err)
+		}
+		for {
+			url, err := fReader.ReadFile()
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				log.Fatal(fmt.Errorf("failed to read the storage file: %w", err))
+			}
+			urlList.Store(url.ShortURL, url.OriginalURL)
+		}
+		err = os.MkdirAll("tmp", 0750)
+		if err != nil && !os.IsExist(err) {
+			log.Fatal(err)
+		}
+	default:
+		urlList = sync.Map{}
+		reader = &store.MemoryReader{
+			URLList: &urlList,
+		}
+		writer = &store.MemoryWriter{
+			URLList: &urlList,
+		}
 	}
-	err = os.MkdirAll("tmp", 0750)
-	if err != nil && !os.IsExist(err) {
+	myLogger, err := logger.Initialize(appConfig.FlagLogLevel)
+	if err != nil {
 		log.Fatal(err)
 	}
-	r, err := Router(appConfig, l)
+	a := NewApp(appConfig, myLogger, reader, writer)
+	r, err := Router(a)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -37,6 +96,25 @@ func TestMain(m *testing.M) {
 	status := m.Run()
 	os.Exit(status)
 }
+
+func getTestConnection(dsnString string) *sql.DB {
+	if dsnString == "" {
+		return nil
+	}
+
+	db, err := sql.Open("postgres", dsnString)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = db.Ping()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return db
+}
+
 func testRequest(t *testing.T, ts *httptest.Server, method, path string, body string) (*http.Response, string) {
 	req, err := http.NewRequest(method, ts.URL+path, strings.NewReader(body))
 	require.NoError(t, err)
@@ -69,7 +147,6 @@ func TestPostHandler_PositiveCases(t *testing.T) {
 		tt := tt
 		t.Run(
 			tt.name, func(t *testing.T) {
-				urlList = sync.Map{}
 				resp, respBody := testRequest(t, ts, "POST", "/", tt.URL)
 				defer resp.Body.Close()
 				assert.Equal(t, tt.expectedStatus, resp.StatusCode, "Код ответа не совпадает с ожидаемым")
@@ -129,7 +206,6 @@ func TestGetHandler_PositiveCases(t *testing.T) {
 		tt := tt
 		t.Run(
 			tt.name, func(t *testing.T) {
-				urlList = sync.Map{}
 				urlList.Store(tt.shortURL, tt.expectedLocation)
 				resp, respBody := testRequest(t, ts, "GET", "/"+tt.shortURL, "")
 				defer resp.Body.Close()
@@ -194,7 +270,7 @@ func TestJSONHandler(t *testing.T) {
 			name:           "success_json_post_request",
 			method:         http.MethodPost,
 			expectedStatus: http.StatusCreated,
-			body:           "{\n  \"url\": \"https://practicum.yandex.ru\"\n} ",
+			body:           "{\n  \"url\": \"https://ya.ru\"\n} ",
 			baseURL:        "http://localhost:8080/",
 		},
 		{
@@ -221,7 +297,6 @@ func TestJSONHandler(t *testing.T) {
 				req.SetBody(tt.body)
 				resp, err := req.Send()
 				require.NoError(t, err)
-				urlList = sync.Map{}
 				assert.Equal(t, tt.expectedStatus, resp.StatusCode(), "Код ответа не совпадает с ожидаемым")
 				if !tt.wantError {
 					require.NotEmpty(t, resp, "Тело ответа пустое")
