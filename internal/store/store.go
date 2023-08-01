@@ -18,6 +18,10 @@ type ConflictError struct {
 	Err      error
 }
 
+type DeletedURLError struct {
+	Err error
+}
+
 type Reader interface {
 	GetURL(ctx context.Context, shortURL string) (string, error)
 }
@@ -33,6 +37,7 @@ type Pingable interface {
 
 type UsersURLGetter interface {
 	GetURLsByUserID(ctx context.Context, userID string) ([]URL, error)
+	FilterURLsByUserID(ctx context.Context, userID string, URLs []URL) ([]URL, error)
 }
 
 type UserIDReader interface {
@@ -47,4 +52,17 @@ type Writer interface {
 
 func (ce *ConflictError) Error() string {
 	return fmt.Sprintf("conflict: %v", ce.Err)
+}
+
+type DeleteURLs interface {
+	DeleteURLs(ctx context.Context, URLs []URL) error
+}
+
+type WriterDeleter interface {
+	Writer
+	DeleteURLs
+}
+
+func (ce *DeletedURLError) Error() string {
+	return fmt.Sprintf("requested URL deleted: %v", ce.Err)
 }

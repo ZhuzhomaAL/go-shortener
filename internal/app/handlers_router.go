@@ -30,6 +30,7 @@ func Router(app *app) (chi.Router, error) {
 	)
 	r.Get("/ping", app.pingDBHandler)
 	r.Get("/api/user/urls", app.getUserURLHandler)
+	r.Delete("/api/user/urls", app.deleteHandler)
 
 	return r, nil
 }

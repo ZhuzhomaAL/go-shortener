@@ -2,8 +2,6 @@ package app
 
 import (
 	"encoding/json"
-	"github.com/ZhuzhomaAL/go-shortener/cmd/config"
-	"github.com/ZhuzhomaAL/go-shortener/internal/logger"
 	"github.com/ZhuzhomaAL/go-shortener/internal/store"
 	"github.com/ZhuzhomaAL/go-shortener/internal/utils"
 	"github.com/dchest/uniuri"
@@ -14,17 +12,6 @@ import (
 	"net/http"
 	"net/url"
 )
-
-type app struct {
-	appConfig config.AppConfig
-	myLogger  logger.MyLogger
-	reader    store.Reader
-	writer    store.Writer
-}
-
-func NewApp(appConfig config.AppConfig, myLogger logger.MyLogger, reader store.Reader, writer store.Writer) *app {
-	return &app{appConfig: appConfig, myLogger: myLogger, reader: reader, writer: writer}
-}
 
 type result struct {
 	Result string `json:"result"`
@@ -93,6 +80,11 @@ func (a *app) makeSinglePlainResponse(rw http.ResponseWriter, genShortStr string
 func (a *app) getHandler(rw http.ResponseWriter, req *http.Request, id string) {
 	location, err := a.reader.GetURL(req.Context(), id)
 	if err != nil {
+		if err, ok := err.(*store.DeletedURLError); ok {
+			a.myLogger.L.Error("requested URL deleted", zap.Error(err))
+			rw.WriteHeader(http.StatusGone)
+			return
+		}
 		http.Error(rw, "location not found", http.StatusBadRequest)
 		return
 	}
@@ -228,7 +220,6 @@ func (a *app) JSONHandler(rw http.ResponseWriter, req *http.Request) {
 			a.myLogger.L.Error("duplicate key value", zap.Error(err))
 			a.makeSingleJSONResponse(rw, err.ShortURL, http.StatusConflict)
 			return
-
 		}
 		a.myLogger.L.Error("failed to persist data", zap.Error(err))
 		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
@@ -316,4 +307,45 @@ func (a *app) getUserURLHandler(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 		return
 	}
+}
+
+func (a *app) deleteHandler(rw http.ResponseWriter, req *http.Request) {
+	var result []string
+	if err := json.NewDecoder(req.Body).Decode(&result); err != nil {
+		if err == io.EOF {
+			http.Error(rw, "request is empty, expected not empty", http.StatusBadRequest)
+			return
+		}
+		a.myLogger.L.Error("failed to decode request", zap.Error(err))
+		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
+		return
+	}
+	userID, ok := req.Context().Value(utils.ContextUserID).(uuid.UUID)
+	if !ok {
+		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
+		return
+	}
+	reader, ok := a.reader.(store.UserIDReader)
+	if !ok {
+		a.myLogger.L.Error("reader can not read user ID")
+		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
+	}
+
+	var shortUrls []store.URL
+	for _, res := range result {
+		URL := store.URL{
+			ShortURL: res,
+		}
+		shortUrls = append(shortUrls, URL)
+	}
+	filteredURLs, err := reader.FilterURLsByUserID(req.Context(), userID.String(), shortUrls)
+	if err != nil {
+		a.myLogger.L.Error("can not filter urls by user ID")
+		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
+	}
+	for _, fu := range filteredURLs {
+		a.storeChan <- fu
+	}
+	rw.Header().Set("Content-Type", "application/json")
+	rw.WriteHeader(http.StatusAccepted)
 }

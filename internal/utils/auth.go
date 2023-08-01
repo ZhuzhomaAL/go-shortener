@@ -44,7 +44,7 @@ func AuthMiddleware(h http.Handler) http.Handler {
 			var id uuid.UUID
 			c, err := r.Cookie("token")
 			if err != nil {
-				if r.URL.Path == "/api/user/urls" {
+				if r.URL.Path == "/api/user/urls" && r.Method == http.MethodGet {
 					w.WriteHeader(http.StatusNoContent)
 					return
 				}
@@ -57,7 +57,7 @@ func AuthMiddleware(h http.Handler) http.Handler {
 			} else {
 				id, err = getUserID(c.Value)
 				if err != nil {
-					if r.URL.Path == "api/user/urls" {
+					if r.URL.Path == "/api/user/urls" {
 						w.WriteHeader(http.StatusUnauthorized)
 						return
 					}
