@@ -29,6 +29,7 @@ func (a *app) deleteURLS() {
 	ticker := time.NewTicker(10 * time.Second)
 
 	var URLs []store.URL
+	ctx := context.Background()
 
 	for {
 		select {
@@ -39,7 +40,7 @@ func (a *app) deleteURLS() {
 				continue
 			}
 			if writer, ok := a.writer.(store.WriterDeleter); ok {
-				err := writer.DeleteURLs(context.Background(), URLs)
+				err := writer.DeleteURLs(ctx, URLs)
 				if err != nil {
 					a.myLogger.L.Error("failed to delete URLs", zap.Error(err))
 					continue
