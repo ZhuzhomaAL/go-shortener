@@ -14,11 +14,11 @@ type app struct {
 	myLogger  logger.MyLogger
 	reader    store.Reader
 	writer    store.Writer
-	storeChan chan store.URL
+	storeChan chan []store.URL
 }
 
 func NewApp(appConfig config.AppConfig, myLogger logger.MyLogger, reader store.Reader, writer store.Writer) *app {
-	a := &app{appConfig: appConfig, myLogger: myLogger, reader: reader, writer: writer, storeChan: make(chan store.URL)}
+	a := &app{appConfig: appConfig, myLogger: myLogger, reader: reader, writer: writer, storeChan: make(chan []store.URL, 1000)}
 
 	go a.deleteURLS()
 
@@ -33,7 +33,7 @@ func (a *app) deleteURLS() {
 	for {
 		select {
 		case URL := <-a.storeChan:
-			URLs = append(URLs, URL)
+			URLs = append(URLs, URL...)
 		case <-ticker.C:
 			if len(URLs) == 0 {
 				continue

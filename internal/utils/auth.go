@@ -6,7 +6,6 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
 	"net/http"
-	"time"
 )
 
 type contextUserIDKey int
@@ -20,14 +19,11 @@ type Claims struct {
 
 var jwtKey = []byte("my_secret_key")
 
-func generateJWT(id uuid.UUID, expirationTime time.Time) (string, error) {
+func generateJWT(id uuid.UUID) (string, error) {
 	token := jwt.NewWithClaims(
 		jwt.SigningMethodHS256, Claims{
-			RegisteredClaims: jwt.RegisteredClaims{
-				ExpiresAt: jwt.NewNumericDate(expirationTime),
-			},
-
-			UserID: id,
+			RegisteredClaims: jwt.RegisteredClaims{},
+			UserID:           id,
 		},
 	)
 
@@ -42,6 +38,7 @@ func AuthMiddleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			var id uuid.UUID
+			isAuthorized := false
 			c, err := r.Cookie("token")
 			if err != nil {
 				if r.URL.Path == "/api/user/urls" && r.Method == http.MethodGet {
@@ -63,21 +60,22 @@ func AuthMiddleware(h http.Handler) http.Handler {
 					}
 					id = uuid.New()
 				}
+				isAuthorized = true
 			}
-			expirationTime := time.Now().Add(5 * time.Minute)
-			tokenString, err := generateJWT(id, expirationTime)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
+			if !isAuthorized {
+				tokenString, err := generateJWT(id)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				http.SetCookie(
+					w, &http.Cookie{
+						Name:  "token",
+						Value: tokenString,
+						Path:  "/",
+					},
+				)
 			}
-			http.SetCookie(
-				w, &http.Cookie{
-					Name:    "token",
-					Value:   tokenString,
-					Expires: expirationTime,
-					Path:    "/",
-				},
-			)
 			ctx := context.WithValue(r.Context(), ContextUserID, id)
 			h.ServeHTTP(w, r.WithContext(ctx))
 		},

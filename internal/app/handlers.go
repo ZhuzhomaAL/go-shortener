@@ -343,9 +343,7 @@ func (a *app) deleteHandler(rw http.ResponseWriter, req *http.Request) {
 		a.myLogger.L.Error("can not filter urls by user ID")
 		http.Error(rw, "internal server error occurred", http.StatusInternalServerError)
 	}
-	for _, fu := range filteredURLs {
-		a.storeChan <- fu
-	}
+	a.storeChan <- filteredURLs
 	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(http.StatusAccepted)
 }
