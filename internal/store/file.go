@@ -19,16 +19,16 @@ type FileWriter struct {
 	Writer       *file.Writer
 }
 
-func (fw *FileWriter) SaveURL(ctx context.Context, shortURL string, fullURL string) error {
-	err := fw.MemoryWriter.SaveURL(ctx, shortURL, fullURL)
+func (fw *FileWriter) SaveURL(ctx context.Context, URL URL) error {
+	err := fw.MemoryWriter.SaveURL(ctx, URL)
 	if err != nil {
 		return err
 	}
 	id := uuid.New()
 	fileURL := &file.URL{
 		ID:          id,
-		ShortURL:    shortURL,
-		OriginalURL: fullURL,
+		ShortURL:    URL.ShortURL,
+		OriginalURL: URL.OriginalURL,
 	}
 
 	return fw.Writer.WriteFile(fileURL)
@@ -36,7 +36,7 @@ func (fw *FileWriter) SaveURL(ctx context.Context, shortURL string, fullURL stri
 
 func (fw *FileWriter) SaveBatch(ctx context.Context, batchURL []URL) error {
 	for _, item := range batchURL {
-		err := fw.SaveURL(ctx, item.ShortURL, item.OriginalURL)
+		err := fw.SaveURL(ctx, item)
 		if err != nil {
 			return err
 		}

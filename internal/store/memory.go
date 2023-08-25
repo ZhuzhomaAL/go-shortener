@@ -23,8 +23,8 @@ type MemoryWriter struct {
 	URLList *sync.Map
 }
 
-func (mw *MemoryWriter) SaveURL(ctx context.Context, shortURL string, fullURL string) error {
-	mw.URLList.Store(shortURL, fullURL)
+func (mw *MemoryWriter) SaveURL(ctx context.Context, URL URL) error {
+	mw.URLList.Store(URL.ShortURL, URL.OriginalURL)
 	return nil
 }
 
